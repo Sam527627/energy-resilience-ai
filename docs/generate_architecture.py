@@ -1,0 +1,211 @@
+"""
+Generates the EnergyShield AI architecture diagram as a high-quality PNG.
+Run: python docs/generate_architecture.py
+"""
+
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+try:
+    from PIL import Image, ImageDraw, ImageFont
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
+
+import json
+
+ARCH_SVG = """
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#020c1b"/>
+      <stop offset="100%" style="stop-color:#0a1628"/>
+    </linearGradient>
+    <linearGradient id="header-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#0077b6"/>
+      <stop offset="100%" style="stop-color:#00b4d8"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#00bcd4" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="700" fill="url(#bg)"/>
+  
+  <!-- Grid lines -->
+  <g stroke="#0d2040" stroke-width="0.5" opacity="0.4">
+    <line x1="0" y1="100" x2="1200" y2="100"/>
+    <line x1="0" y1="200" x2="1200" y2="200"/>
+    <line x1="0" y1="300" x2="1200" y2="300"/>
+    <line x1="0" y1="400" x2="1200" y2="400"/>
+    <line x1="0" y1="500" x2="1200" y2="500"/>
+    <line x1="0" y1="600" x2="1200" y2="600"/>
+    <line x1="200" y1="0" x2="200" y2="700"/>
+    <line x1="400" y1="0" x2="400" y2="700"/>
+    <line x1="600" y1="0" x2="600" y2="700"/>
+    <line x1="800" y1="0" x2="800" y2="700"/>
+    <line x1="1000" y1="0" x2="1000" y2="700"/>
+  </g>
+
+  <!-- Header -->
+  <rect x="0" y="0" width="1200" height="60" fill="url(#header-grad)" opacity="0.9"/>
+  <text x="30" y="38" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="white">⚡ EnergyShield AI — System Architecture</text>
+  <text x="900" y="25" font-family="Arial, sans-serif" font-size="11" fill="rgba(255,255,255,0.7)">ET AI Hackathon 2026 | PS 2: Energy Supply Chain Resilience</text>
+  <text x="900" y="45" font-family="Arial, sans-serif" font-size="11" fill="rgba(255,255,255,0.7)">Sambhav Kapoor | github.com/Sam527627</text>
+
+  <!-- Layer Labels -->
+  <text x="60" y="90" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#546e7a" letter-spacing="2">DATA LAYER</text>
+  <text x="290" y="90" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#546e7a" letter-spacing="2">AGENT LAYER</text>
+  <text x="650" y="90" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#546e7a" letter-spacing="2">INTELLIGENCE ENGINE</text>
+  <text x="950" y="90" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#546e7a" letter-spacing="2">PRESENTATION</text>
+
+  <!-- Vertical separators -->
+  <line x1="250" y1="70" x2="250" y2="680" stroke="#1e3a5f" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="620" y1="70" x2="620" y2="680" stroke="#1e3a5f" stroke-width="1" stroke-dasharray="4,4"/>
+  <line x1="890" y1="70" x2="890" y2="680" stroke="#1e3a5f" stroke-width="1" stroke-dasharray="4,4"/>
+
+  <!-- DATA SOURCES -->
+  <!-- NewsAPI -->
+  <rect x="20" y="110" width="210" height="50" rx="8" fill="#0d1b2e" stroke="#1e3a5f" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="40" y="133" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#e8f4f8">📰 NewsAPI</text>
+  <text x="40" y="150" font-family="Arial, sans-serif" font-size="11" fill="#546e7a">Geopolitical headlines · Live</text>
+
+  <!-- AIS -->
+  <rect x="20" y="175" width="210" height="50" rx="8" fill="#0d1b2e" stroke="#1e3a5f" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="40" y="198" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#e8f4f8">🚢 AIS Feed</text>
+  <text x="40" y="215" font-family="Arial, sans-serif" font-size="11" fill="#546e7a">Vessel tracking · Corridors</text>
+
+  <!-- Commodity -->
+  <rect x="20" y="240" width="210" height="50" rx="8" fill="#0d1b2e" stroke="#1e3a5f" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="40" y="263" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#e8f4f8">📈 Commodity Feed</text>
+  <text x="40" y="280" font-family="Arial, sans-serif" font-size="11" fill="#546e7a">Brent · WTI · BDTI · Yahoo Fin</text>
+
+  <!-- Sanctions -->
+  <rect x="20" y="305" width="210" height="50" rx="8" fill="#0d1b2e" stroke="#1e3a5f" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="40" y="328" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#e8f4f8">🔒 Sanctions Registries</text>
+  <text x="40" y="345" font-family="Arial, sans-serif" font-size="11" fill="#546e7a">OFAC · EU · UN · UK</text>
+
+  <!-- SPR -->
+  <rect x="20" y="370" width="210" height="50" rx="8" fill="#0d1b2e" stroke="#1e3a5f" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="40" y="393" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#e8f4f8">🛢️ SPR / ISPRL Data</text>
+  <text x="40" y="410" font-family="Arial, sans-serif" font-size="11" fill="#546e7a">Site levels · Drawdown rules</text>
+
+  <!-- Refinery -->
+  <rect x="20" y="435" width="210" height="50" rx="8" fill="#0d1b2e" stroke="#1e3a5f" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="40" y="458" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#e8f4f8">🏭 Refinery Network</text>
+  <text x="40" y="475" font-family="Arial, sans-serif" font-size="11" fill="#546e7a">6 sites · Capacity · Grade specs</text>
+
+  <!-- AGENTS -->
+  <!-- GeoSentinel -->
+  <rect x="270" y="110" width="330" height="60" rx="8" fill="#0d2535" stroke="#00bcd4" stroke-width="2" filter="url(#shadow)"/>
+  <text x="292" y="137" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#00bcd4">🌍 GeoSentinel Agent</text>
+  <text x="292" y="157" font-family="Arial, sans-serif" font-size="11" fill="#78909c">Ingests news + prices → corridor risk scores (0–100)</text>
+
+  <!-- AIS Agent -->
+  <rect x="270" y="190" width="330" height="60" rx="8" fill="#0d2535" stroke="#4488FF" stroke-width="2" filter="url(#shadow)"/>
+  <text x="292" y="217" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#4488FF">🚢 AIS Tracker Agent</text>
+  <text x="292" y="237" font-family="Arial, sans-serif" font-size="11" fill="#78909c">Real-time vessel positions · At-risk detection</text>
+
+  <!-- Scenario -->
+  <rect x="270" y="270" width="330" height="60" rx="8" fill="#0d2535" stroke="#FF8C00" stroke-width="2" filter="url(#shadow)"/>
+  <text x="292" y="297" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#FF8C00">📊 Scenario Modeller Agent</text>
+  <text x="292" y="317" font-family="Arial, sans-serif" font-size="11" fill="#78909c">Disruption → GDP / fuel price / refinery impact</text>
+
+  <!-- Procurement -->
+  <rect x="270" y="350" width="330" height="60" rx="8" fill="#0d2535" stroke="#44BB44" stroke-width="2" filter="url(#shadow)"/>
+  <text x="292" y="377" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#44BB44">🛒 Procurement Orchestrator</text>
+  <text x="292" y="397" font-family="Arial, sans-serif" font-size="11" fill="#78909c">Alt sources ranked by price · transit · grade fit</text>
+
+  <!-- SPR -->
+  <rect x="270" y="430" width="330" height="60" rx="8" fill="#0d2535" stroke="#FFD700" stroke-width="2" filter="url(#shadow)"/>
+  <text x="292" y="457" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#FFD700">🛢️ SPR Optimiser Agent</text>
+  <text x="292" y="477" font-family="Arial, sans-serif" font-size="11" fill="#78909c">Drawdown schedules · IEA coordination · Replenishment</text>
+
+  <!-- INTELLIGENCE ENGINE -->
+  <rect x="640" y="110" width="230" height="80" rx="8" fill="#12203a" stroke="#7c4dff" stroke-width="2" filter="url(#shadow)"/>
+  <text x="660" y="138" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#b39ddb">🤖 Claude Sonnet</text>
+  <text x="660" y="158" font-family="Arial, sans-serif" font-size="11" fill="#78909c">LLM reasoning core</text>
+  <text x="660" y="178" font-family="Arial, sans-serif" font-size="11" fill="#78909c">Multi-agent orchestration</text>
+
+  <rect x="640" y="210" width="230" height="60" rx="8" fill="#12203a" stroke="#7c4dff" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="660" y="237" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#b39ddb">🗃️ Scenario Engine</text>
+  <text x="660" y="257" font-family="Arial, sans-serif" font-size="11" fill="#78909c">5 disruption models · cascade logic</text>
+
+  <rect x="640" y="290" width="230" height="60" rx="8" fill="#12203a" stroke="#7c4dff" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="660" y="317" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#b39ddb">📐 Procurement Ranker</text>
+  <text x="660" y="337" font-family="Arial, sans-serif" font-size="11" fill="#78909c">Multi-criteria alt source scoring</text>
+
+  <rect x="640" y="370" width="230" height="60" rx="8" fill="#12203a" stroke="#7c4dff" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="660" y="397" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#b39ddb">🌍 Geospatial Layer</text>
+  <text x="660" y="417" font-family="Arial, sans-serif" font-size="11" fill="#78909c">Folium maps · corridor overlays</text>
+
+  <rect x="640" y="450" width="230" height="60" rx="8" fill="#12203a" stroke="#7c4dff" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="660" y="477" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#b39ddb">📊 Analytics Engine</text>
+  <text x="660" y="497" font-family="Arial, sans-serif" font-size="11" fill="#78909c">Plotly · Time-series · Scenarios</text>
+
+  <!-- PRESENTATION -->
+  <rect x="910" y="110" width="270" height="400" rx="8" fill="#0d1b2e" stroke="#00bcd4" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="930" y="140" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#00bcd4">⚡ Streamlit Dashboard</text>
+  
+  <rect x="925" y="155" width="240" height="35" rx="5" fill="#0a1628" stroke="#1e3a5f" stroke-width="1"/>
+  <text x="942" y="176" font-family="Arial, sans-serif" font-size="12" fill="#e8f4f8">🏠 Command Centre</text>
+
+  <rect x="925" y="200" width="240" height="35" rx="5" fill="#0a1628" stroke="#1e3a5f" stroke-width="1"/>
+  <text x="942" y="221" font-family="Arial, sans-serif" font-size="12" fill="#e8f4f8">🌍 Risk Intelligence</text>
+
+  <rect x="925" y="245" width="240" height="35" rx="5" fill="#0a1628" stroke="#1e3a5f" stroke-width="1"/>
+  <text x="942" y="266" font-family="Arial, sans-serif" font-size="12" fill="#e8f4f8">📊 Scenario Modeller</text>
+
+  <rect x="925" y="290" width="240" height="35" rx="5" fill="#0a1628" stroke="#1e3a5f" stroke-width="1"/>
+  <text x="942" y="311" font-family="Arial, sans-serif" font-size="12" fill="#e8f4f8">🚢 AIS Tracker</text>
+
+  <rect x="925" y="335" width="240" height="35" rx="5" fill="#0a1628" stroke="#1e3a5f" stroke-width="1"/>
+  <text x="942" y="356" font-family="Arial, sans-serif" font-size="12" fill="#e8f4f8">🛒 Procurement Engine</text>
+
+  <rect x="925" y="380" width="240" height="35" rx="5" fill="#0a1628" stroke="#1e3a5f" stroke-width="1"/>
+  <text x="942" y="401" font-family="Arial, sans-serif" font-size="12" fill="#e8f4f8">🛢️ SPR Optimiser</text>
+
+  <rect x="925" y="425" width="240" height="35" rx="5" fill="#0a1628" stroke="#1e3a5f" stroke-width="1"/>
+  <text x="942" y="446" font-family="Arial, sans-serif" font-size="12" fill="#e8f4f8">📋 PDF Report Generator</text>
+
+  <!-- Connection arrows (data → agents) -->
+  <g stroke="#1e3a5f" stroke-width="1.5" fill="none" marker-end="url(#arrow)">
+    <line x1="230" y1="135" x2="268" y2="140"/>
+    <line x1="230" y1="200" x2="268" y2="220"/>
+    <line x1="230" y1="265" x2="268" y2="300"/>
+    <line x1="230" y1="330" x2="268" y2="380"/>
+    <line x1="230" y1="395" x2="268" y2="460"/>
+  </g>
+
+  <!-- Connection arrows (agents → engine) -->
+  <g stroke="#7c4dff" stroke-width="1.5" fill="none" opacity="0.7">
+    <line x1="600" y1="140" x2="638" y2="150"/>
+    <line x1="600" y1="220" x2="638" y2="240"/>
+    <line x1="600" y1="300" x2="638" y2="320"/>
+    <line x1="600" y1="380" x2="638" y2="400"/>
+    <line x1="600" y1="460" x2="638" y2="480"/>
+  </g>
+
+  <!-- Connection arrows (engine → dashboard) -->
+  <g stroke="#00bcd4" stroke-width="2" fill="none" opacity="0.8">
+    <line x1="870" y1="310" x2="908" y2="310"/>
+  </g>
+
+  <!-- Footer -->
+  <rect x="0" y="640" width="1200" height="60" fill="#020c1b" opacity="0.9"/>
+  <text x="30" y="668" font-family="Arial, sans-serif" font-size="12" fill="#546e7a">Stack: Python · Anthropic Claude Sonnet · Streamlit · Folium · Plotly · NewsAPI · yfinance · AIS</text>
+  <text x="30" y="688" font-family="Arial, sans-serif" font-size="12" fill="#546e7a">Judging: Innovation 25% · Business Impact 25% · Technical Excellence 20% · Scalability 15% · UX 15%</text>
+  <text x="900" y="668" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#00bcd4">EnergyShield AI © 2026</text>
+  <text x="900" y="688" font-family="Arial, sans-serif" font-size="11" fill="#546e7a">ET AI Hackathon | Sambhav Kapoor</text>
+</svg>
+"""
+
+# Save SVG
+svg_path = "/home/claude/energy-resilience-ai/docs/architecture.svg"
+with open(svg_path, "w") as f:
+    f.write(ARCH_SVG)
+
+print(f"Architecture diagram saved: {svg_path}")
+print("Open in a browser or convert with: cairosvg architecture.svg -o architecture.png")
