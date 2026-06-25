@@ -71,7 +71,10 @@ def get_brent_history_live(days=90):
     key = f"brent_{days}"
     c = _get(key)
     if c is not None:
-        try: return pd.read_json(c)
+        try:
+            df = pd.read_json(c)
+            if "brent_usd" in df.columns:
+                return df
         except: pass
     df = None
     if not DEMO_MODE:
@@ -80,12 +83,17 @@ def get_brent_history_live(days=90):
             from datetime import date
             end = date.today()
             start = end - timedelta(days=days)
-            raw = yf.download("BZ=F", start=start.isoformat(), end=end.isoformat(), progress=False, auto_adjust=True)
+            raw = yf.download("BZ=F", start=start.isoformat(), end=end.isoformat(), progress=False)
             if not raw.empty:
-                raw.columns = [c[0] if isinstance(c, tuple) else c for c in raw.columns]
-                col = "Close" if "Close" in raw.columns else raw.columns[0]
-                df = raw[[col]].rename(columns={col:"brent_usd"})
-                df.index = pd.to_datetime(df.index)
+                # Flatten MultiIndex columns (yfinance v0.2+)
+                if hasattr(raw.columns, "levels"):
+                    raw.columns = raw.columns.get_level_values(0)
+                # Find price column
+                for col in ["Close","Adj Close","close","adj close"]:
+                    if col in raw.columns:
+                        df = pd.DataFrame({"brent_usd": raw[col].values}, index=raw.index)
+                        df.index = pd.to_datetime(df.index)
+                        break
         except: pass
     if df is None:
         np.random.seed(7)
