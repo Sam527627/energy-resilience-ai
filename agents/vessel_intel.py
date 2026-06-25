@@ -79,7 +79,7 @@ DEMO_VESSELS = {
 # ─────────────────────────────────────────────
 # LIVE AIS LOOKUP — tries all configured providers
 # ─────────────────────────────────────────────
-def lookup_vessel(query: str) -> dict | None:
+def lookup_vessel(query: str):
     """
     Look up vessel by IMO or name.
     Priority: Datalastic → MarineTraffic → VesselFinder → demo DB
@@ -120,7 +120,7 @@ def lookup_vessel(query: str) -> dict | None:
     return vessel
 
 
-def _fetch_datalastic(query: str) -> dict | None:
+def _fetch_datalastic(query: str):
     try:
         params = {"api-key": AIS_API_KEY}
         if query.isdigit() and len(query) == 7:
@@ -136,7 +136,7 @@ def _fetch_datalastic(query: str) -> dict | None:
         return None
 
 
-def _fetch_marinetraffic(query: str) -> dict | None:
+def _fetch_marinetraffic(query: str):
     try:
         params = {"v": 3, "apikey": MARINETRAFFIC_KEY,
                   "imo": query if query.isdigit() else None,
@@ -162,7 +162,7 @@ def _fetch_marinetraffic(query: str) -> dict | None:
         return None
 
 
-def _fetch_vesselfinder(query: str) -> dict | None:
+def _fetch_vesselfinder(query: str):
     try:
         params = {"userkey": VESSELFINDER_KEY,
                   "imo": query if query.isdigit() else None,
@@ -212,7 +212,7 @@ def _infer_corridor(lat: float, lon: float) -> str:
     return "open_ocean"
 
 
-def _demo_lookup(query: str) -> dict | None:
+def _demo_lookup(query: str):
     query = query.upper().strip()
     # By IMO
     if query in DEMO_VESSELS:
