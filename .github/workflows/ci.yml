@@ -23,18 +23,22 @@ jobs:
         pip install -r requirements.txt
         pip install pytest
 
-    - name: Run tests
+    - name: Run all 12 tests
       env:
         DEMO_MODE: "true"
-      run: |
-        python -m pytest tests/ -v
+      run: python -m pytest tests/ -v
 
-    - name: Verify imports
-      env:
-        DEMO_MODE: "true"
-      run: |
-        python -c "from config.settings import CORRIDORS, INDIA_REFINERIES; print('Config OK')"
-        python -c "from utils.commodity_feed import get_live_prices; p = get_live_prices(); print('Commodity feed OK: Brent ' + str(p['brent_crude']['price']))"
-        python -c "from utils.news_fetcher import fetch_geopolitical_news; h = fetch_geopolitical_news(3); print('News feed OK: ' + str(len(h)) + ' headlines')"
-        python -c "from agents.ais_tracker import get_live_vessels; v = get_live_vessels(); print('AIS OK: ' + str(len(v)) + ' vessels tracked')"
-        python -c "from agents.vessel_intel import lookup_vessel, get_demo_fleet; v = lookup_vessel('9839131'); print('Vessel intel OK: ' + v['name'])"
+    - name: Verify config
+      run: python -c "from config.settings import CORRIDORS; print('Config OK -', len(CORRIDORS), 'corridors')"
+
+    - name: Verify commodity feed
+      run: python -c "from utils.commodity_feed import get_live_prices; p = get_live_prices(); print('Commodity OK')"
+
+    - name: Verify news feed
+      run: python -c "from utils.news_fetcher import fetch_geopolitical_news; h = fetch_geopolitical_news(3); print('News OK -', len(h), 'headlines')"
+
+    - name: Verify AIS tracker
+      run: python -c "from agents.ais_tracker import get_live_vessels; v = get_live_vessels(); print('AIS OK -', len(v), 'vessels')"
+
+    - name: Verify vessel intel
+      run: python -c "from agents.vessel_intel import lookup_vessel; v = lookup_vessel('9839131'); print('Vessel OK -', v['name'])"
