@@ -29,6 +29,10 @@ def _set(key, val, ttl=300):
         else: CACHE[key] = val
     except: pass
 
+# Public aliases used by vessel_intel.py
+def cache_get(key): return _get(key)
+def cache_set(key, val, ttl=300): return _set(key, val, ttl)
+
 # ─── COMMODITY PRICES ───────────────────────
 def get_live_commodity_prices(force=False):
     key = "prices_v2"
