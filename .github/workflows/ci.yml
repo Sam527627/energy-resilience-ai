@@ -29,9 +29,12 @@ jobs:
       run: |
         python -m pytest tests/ -v
 
-    - name: Verify app imports
+    - name: Verify imports
+      env:
+        DEMO_MODE: "true"
       run: |
         python -c "from config.settings import CORRIDORS, INDIA_REFINERIES; print('Config OK')"
-        python -c "from utils.commodity_feed import get_live_prices; p = get_live_prices(); print(f'Commodity feed OK: Brent ${p[\"brent_crude\"][\"price\"]}')"
-        python -c "from utils.news_fetcher import fetch_geopolitical_news; h = fetch_geopolitical_news(3); print(f'News feed OK: {len(h)} headlines')"
-        python -c "from agents.ais_tracker import get_live_vessels; v = get_live_vessels(); print(f'AIS OK: {len(v)} vessels tracked')"
+        python -c "from utils.commodity_feed import get_live_prices; p = get_live_prices(); print('Commodity feed OK: Brent ' + str(p['brent_crude']['price']))"
+        python -c "from utils.news_fetcher import fetch_geopolitical_news; h = fetch_geopolitical_news(3); print('News feed OK: ' + str(len(h)) + ' headlines')"
+        python -c "from agents.ais_tracker import get_live_vessels; v = get_live_vessels(); print('AIS OK: ' + str(len(v)) + ' vessels tracked')"
+        python -c "from agents.vessel_intel import lookup_vessel, get_demo_fleet; v = lookup_vessel('9839131'); print('Vessel intel OK: ' + v['name'])"
