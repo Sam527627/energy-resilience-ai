@@ -80,9 +80,11 @@ def get_brent_history_live(days=90):
             from datetime import date
             end = date.today()
             start = end - timedelta(days=days)
-            raw = yf.download("BZ=F", start=start.isoformat(), end=end.isoformat(), progress=False)
+            raw = yf.download("BZ=F", start=start.isoformat(), end=end.isoformat(), progress=False, auto_adjust=True)
             if not raw.empty:
-                df = raw[["Close"]].rename(columns={"Close":"brent_usd"})
+                raw.columns = [c[0] if isinstance(c, tuple) else c for c in raw.columns]
+                col = "Close" if "Close" in raw.columns else raw.columns[0]
+                df = raw[[col]].rename(columns={col:"brent_usd"})
                 df.index = pd.to_datetime(df.index)
         except: pass
     if df is None:
