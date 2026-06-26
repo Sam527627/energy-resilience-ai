@@ -294,3 +294,79 @@ def _demo_news():
         {"title":"Indian refiners pivot to spot market as Saudi OSPs rise $3.2/bbl for July","source":"Platts","published":"2026-06-20","url":"#","description":"Saudi Aramco raised official selling prices for Arab Light crude to Asia.","risk_score":55,"corridor":"strait_of_hormuz"},
         {"title":"Pentagon expands naval escort operations for tankers in Gulf of Oman","source":"Defense News","published":"2026-06-19","url":"#","description":"US Fifth Fleet announced expansion of escort operations for commercial tankers.","risk_score":70,"corridor":"strait_of_hormuz"},
     ]
+
+
+# ═══════════════════════════════════════════
+# ADDITIONAL LIVE FEEDS (Meridian expansion)
+# ═══════════════════════════════════════════
+def get_fx_rates():
+    """USD/INR and key FX — FREE Frankfurter API, no key."""
+    key = "fx_rates"
+    c = _get(key)
+    if c: return c
+    data = {"USD_INR": 83.4, "USD_EUR": 0.92, "BRENT_INR_bbl": 7290, "source": "fallback"}
+    try:
+        r = requests.get("https://api.frankfurter.app/latest", params={"from":"USD","to":"INR,EUR,GBP,JPY"}, timeout=8)
+        rates = r.json().get("rates", {})
+        if rates:
+            data = {"USD_INR":round(rates.get("INR",83.4),2),"USD_EUR":round(rates.get("EUR",0.92),3),
+                   "USD_GBP":round(rates.get("GBP",0.79),3),"USD_JPY":round(rates.get("JPY",149),1),
+                   "source":"Frankfurter (live)","_ts":datetime.utcnow().isoformat()}
+    except: pass
+    _set(key, data, 3600)
+    return data
+
+def get_gdelt_news(n=8):
+    """GDELT global news — FREE, no key. Maritime/energy geopolitics."""
+    key = f"gdelt_{n}"
+    c = _get(key)
+    if c: return c
+    articles = []
+    try:
+        r = requests.get("https://api.gdeltproject.org/api/v2/doc/doc", params={
+            "query":"(Hormuz OR Houthi OR \"Red Sea shipping\" OR \"oil tanker\") sourcelang:english",
+            "mode":"artlist","maxrecords":n,"format":"json","sort":"datedesc"
+        }, timeout=12)
+        for a in r.json().get("articles", [])[:n]:
+            title = a.get("title","")
+            articles.append({"title":title,"source":a.get("domain","GDELT"),
+                           "published":a.get("seendate","")[:8],"url":a.get("url","#"),
+                           "description":"","risk_score":_score(title),"corridor":_corridor(title)})
+    except: pass
+    if articles:
+        _set(key, articles, 600)
+    return articles
+
+def get_eia_brent_live():
+    """EIA official Brent spot price — government source."""
+    from config.settings import EIA_API_KEY
+    if not EIA_API_KEY:
+        return None
+    key = "eia_brent"
+    c = _get(key)
+    if c: return c
+    try:
+        r = requests.get("https://api.eia.gov/v2/petroleum/pri/spt/data/", params={
+            "api_key":EIA_API_KEY,"frequency":"daily","data[0]":"value",
+            "facets[series][]":"RBRTE","sort[0][column]":"period","sort[0][direction]":"desc","length":5
+        }, timeout=10)
+        data = r.json().get("response",{}).get("data",[])
+        if data:
+            result = {"price":float(data[0]["value"]),"date":data[0]["period"],"source":"EIA (US Gov)"}
+            _set(key, result, 3600)
+            return result
+    except: pass
+    return None
+
+def get_vessel_track_history(imo, lat, lon):
+    """Generate a plausible recent track (last 24h) for map trail display."""
+    import numpy as np
+    np.random.seed(int(imo[-4:]) if imo[-4:].isdigit() else 42)
+    points = []
+    clat, clon = float(lat), float(lon)
+    for i in range(12, 0, -1):
+        clat -= np.random.uniform(-0.15, 0.15)
+        clon -= np.random.uniform(0.05, 0.25)
+        points.append([round(clat,4), round(clon,4)])
+    points.append([float(lat), float(lon)])
+    return points

@@ -1,6 +1,6 @@
 """
-EnergyShield AI × Foresight Live — Full Production Platform
-ET AI Hackathon 2026 | PS 2
+MERIDIAN — Maritime Intelligence Platform
+Professional vessel intelligence, voyage risk, and energy supply-chain resilience.
 """
 import streamlit as st
 import pandas as pd
@@ -12,732 +12,540 @@ from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config.settings import CORRIDORS, INDIA_REFINERIES, SPR_SITES
+from config.settings import (
+    CORRIDORS, INDIA_REFINERIES, SPR_SITES, ALL_API_COUNT, BRAND_NAME, BRAND_TAGLINE,
+)
 from utils.live_data import (
     get_live_commodity_prices, get_brent_history_live, get_tanker_rates_live,
-    get_live_news, get_port_intelligence
+    get_live_news, get_port_intelligence, get_route_weather, check_sanctions_live,
+    get_fx_rates, get_gdelt_news, get_vessel_track_history,
 )
-from agents import geo_sentinel, scenario_modeller, procurement_agent, spr_optimiser, ais_tracker
-from agents import vessel_intel
+from agents import geo_sentinel, scenario_modeller, procurement_agent, spr_optimiser, ais_tracker, vessel_intel
 from utils.vra_pdf import generate_vra_pdf
 
-st.set_page_config(page_title="EnergyShield AI × Foresight Live", page_icon="⚡",
+st.set_page_config(page_title="Meridian Maritime Intelligence", page_icon="🧭",
                    layout="wide", initial_sidebar_state="expanded")
 
+# ── THEME ──
 st.markdown("""<style>
-.stApp{background:#f4f6f9;color:#1a2332;}
-[data-testid="stSidebar"]{background:#0d1b2e;}
-[data-testid="stSidebar"] *{color:#e8f4f8 !important;}
-[data-testid="stSidebar"] .stRadio label{color:#e8f4f8 !important;}
-.card{background:#fff;border-radius:10px;padding:16px 20px;border:1px solid #e2e8f0;margin-bottom:12px;box-shadow:0 1px 6px rgba(0,0,0,0.06);}
-.gold-card{background:#fffbf0;border-radius:10px;padding:14px 18px;border:1px solid #c8a14b;margin-bottom:12px;}
-.hdr{background:linear-gradient(90deg,#0d6e6e,#0a4848);color:#fff !important;padding:8px 16px;border-radius:6px;font-size:13px;font-weight:700;letter-spacing:.5px;margin-bottom:14px;}
-.news-row{border-left:3px solid #0d6e6e;padding:8px 12px;background:#fff;border-radius:0 6px 6px 0;margin-bottom:7px;box-shadow:0 1px 3px rgba(0,0,0,0.04);}
-.vessel-card{background:#fff;border-radius:8px;border:1px solid #e2e8f0;padding:10px 14px;margin-bottom:6px;box-shadow:0 1px 3px rgba(0,0,0,0.04);}
-.badge-critical{background:#b71c1c;color:#fff;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;}
-.badge-high{background:#c62828;color:#fff;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;}
-.badge-elevated{background:#e65100;color:#fff;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;}
-.badge-moderate{background:#f57f17;color:#fff;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;}
-.badge-low{background:#2e7d32;color:#fff;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;}
-[data-testid="metric-container"]{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:10px;box-shadow:0 1px 4px rgba(0,0,0,0.05);}
-.stButton>button{background:linear-gradient(135deg,#0d6e6e,#0a4848);color:#fff;border:none;border-radius:6px;font-weight:600;padding:8px 16px;}
-.stButton>button:hover{opacity:.9;}
-.stDownloadButton>button{background:linear-gradient(135deg,#c8a14b,#a0782a);color:#fff;border:none;border-radius:6px;font-weight:700;}
+.stApp{background:#eef2f7;color:#0f1c2e;}
+[data-testid="stSidebar"]{background:linear-gradient(180deg,#0a1628,#0f2440);}
+[data-testid="stSidebar"] *{color:#dce8f5 !important;}
+.block-container{padding-top:1.5rem;}
+.mhdr{background:linear-gradient(90deg,#1a3a5c,#0d2438);color:#fff !important;padding:9px 18px;border-radius:7px;font-size:13px;font-weight:700;letter-spacing:.6px;margin-bottom:14px;box-shadow:0 2px 6px rgba(0,0,0,0.1);}
+.card{background:#fff;border-radius:11px;padding:16px 20px;border:1px solid #dde5ee;margin-bottom:12px;box-shadow:0 2px 10px rgba(15,28,46,0.06);}
+.gold{background:linear-gradient(135deg,#fdf8ec,#faf2dc);border-radius:11px;padding:15px 19px;border:1px solid #cda94e;margin-bottom:12px;}
+.news-row{border-left:3px solid #1a3a5c;padding:9px 13px;background:#fff;border-radius:0 7px 7px 0;margin-bottom:7px;box-shadow:0 1px 4px rgba(0,0,0,0.05);}
+.vcard{background:#fff;border-radius:9px;border:1px solid #dde5ee;padding:11px 15px;margin-bottom:7px;box-shadow:0 1px 4px rgba(0,0,0,0.05);}
+.badge-critical{background:#8b0000;color:#fff;padding:2px 10px;border-radius:11px;font-size:10px;font-weight:700;}
+.badge-high{background:#c62828;color:#fff;padding:2px 10px;border-radius:11px;font-size:10px;font-weight:700;}
+.badge-elevated{background:#e65100;color:#fff;padding:2px 10px;border-radius:11px;font-size:10px;font-weight:700;}
+.badge-moderate{background:#ef9a00;color:#fff;padding:2px 10px;border-radius:11px;font-size:10px;font-weight:700;}
+.badge-low{background:#2e7d32;color:#fff;padding:2px 10px;border-radius:11px;font-size:10px;font-weight:700;}
+[data-testid="metric-container"]{background:#fff;border:1px solid #dde5ee;border-radius:9px;padding:11px;box-shadow:0 1px 5px rgba(0,0,0,0.05);}
+.stButton>button{background:linear-gradient(135deg,#1a3a5c,#0d2438);color:#fff;border:none;border-radius:7px;font-weight:600;padding:9px 16px;}
+.stButton>button:hover{opacity:.92;}
+.stDownloadButton>button{background:linear-gradient(135deg,#cda94e,#a8842f);color:#fff;border:none;border-radius:7px;font-weight:700;}
+.pill{display:inline-block;background:#e8f0f8;color:#1a3a5c;padding:3px 10px;border-radius:12px;font-size:10px;font-weight:600;margin:2px;}
 </style>""", unsafe_allow_html=True)
 
-RC = {"CRITICAL":"#b71c1c","HIGH":"#c62828","ELEVATED":"#e65100","MODERATE":"#f57f17","LOW":"#2e7d32"}
-BG = {"CRITICAL":"#ffebee","HIGH":"#ffcdd2","ELEVATED":"#fff3e0","MODERATE":"#fffde7","LOW":"#e8f5e9"}
+RC={"CRITICAL":"#8b0000","HIGH":"#c62828","ELEVATED":"#e65100","MODERATE":"#ef9a00","LOW":"#2e7d32"}
+BGc={"CRITICAL":"#fdecea","HIGH":"#fde8e8","ELEVATED":"#fff3e6","MODERATE":"#fff9e6","LOW":"#e9f6ea"}
+def badge(l):
+    c={"CRITICAL":"badge-critical","HIGH":"badge-high","ELEVATED":"badge-elevated","MODERATE":"badge-moderate","LOW":"badge-low"}.get(l,"badge-moderate")
+    return f'<span class="{c}">{l}</span>'
+def hdr(t): st.markdown(f'<div class="mhdr">{t}</div>',unsafe_allow_html=True)
 
-def badge(level):
-    cls = {"CRITICAL":"badge-critical","HIGH":"badge-high","ELEVATED":"badge-elevated","MODERATE":"badge-moderate","LOW":"badge-low"}.get(level,"badge-moderate")
-    return f'<span class="{cls}">{level}</span>'
-
-def hdr(t): st.markdown(f'<div class="hdr">{t}</div>', unsafe_allow_html=True)
-
-# ── LIVE DATA ──
-prices = get_live_commodity_prices()
-brent  = prices.get("brent_crude",{})
-bp     = brent.get("price",87.4)
-bc     = brent.get("change_pct",0)
-wti    = prices.get("wti_crude",{})
+prices=get_live_commodity_prices()
+brent=prices.get("brent_crude",{}); bp=brent.get("price",87.4); bc=brent.get("change_pct",0)
+wti=prices.get("wti_crude",{})
+fx=get_fx_rates()
+tankers=get_tanker_rates_live()
 
 # ── SIDEBAR ──
 with st.sidebar:
-    st.markdown("## ⚡ EnergyShield AI")
-    st.markdown("**× Foresight Live**")
+    st.markdown("## 🧭 MERIDIAN")
+    st.markdown("**Maritime Intelligence Platform**")
     st.markdown("---")
-    page = st.radio("", [
-        "🏠 Command Centre",
-        "🛡️ Foresight Live",
-        "🌍 Risk Intelligence",
-        "📊 Scenario Modeller",
-        "🚢 AIS Tracker",
+    page=st.radio("",[
+        "📊 Command Centre",
+        "🔎 Vessel Lookup",
+        "🛡️ Voyage Risk Assessment",
+        "🌍 Corridor Risk Intelligence",
+        "📉 Disruption Scenarios",
+        "🚢 Fleet AIS Tracker",
         "🛒 Procurement Engine",
-        "🛢️ SPR Optimiser",
-    ], label_visibility="collapsed")
+        "🛢️ Strategic Reserve",
+        "🔌 API Status",
+    ],label_visibility="collapsed")
     st.markdown("---")
-    st.markdown("**Live Commodity Prices**")
-    arrow = "▲" if bc>=0 else "▼"
-    col = "#2e7d32" if bc>=0 else "#c62828"
-    st.markdown(f"**Brent Crude**")
-    st.markdown(f"<div style='font-size:22px;font-weight:800;color:#0d6e6e;'>${bp}</div>"
-                f"<div style='color:{col};font-size:12px;'>{arrow} {abs(bc):.1f}%</div>",
-                unsafe_allow_html=True)
-    st.markdown(f"WTI: **${wti.get('price','—')}**")
-    ng = prices.get("natural_gas",{})
-    st.markdown(f"Nat. Gas: **${ng.get('price','—')}/MMBtu**")
+    st.markdown("**Live Markets**")
+    ar="▲" if bc>=0 else "▼"; cl="#5fd97f" if bc>=0 else "#ff7b7b"
+    st.markdown(f"<div style='font-size:11px;color:#9bb3cc;'>BRENT CRUDE</div>"
+                f"<div style='font-size:21px;font-weight:800;color:#fff;'>${bp}</div>"
+                f"<div style='color:{cl};font-size:12px;'>{ar} {abs(bc):.1f}%</div>",unsafe_allow_html=True)
+    st.markdown(f"<div style='font-size:11px;color:#9bb3cc;margin-top:6px;'>WTI ${wti.get('price','—')} · USD/INR ₹{fx.get('USD_INR','—')}</div>",unsafe_allow_html=True)
     st.caption(f"Source: {brent.get('source','—')}")
     st.markdown("---")
-    st.markdown("**SPR Status**")
-    st.progress(0.88, text="88% Full — 9.5 days cover")
+    st.markdown("**Strategic Reserve**")
+    st.progress(0.88,text="88% · 9.5 days cover")
     st.markdown("---")
-    tankers = get_tanker_rates_live()
-    st.markdown("**Tanker Rates ($/day)**")
-    st.caption(f"VLCC ME→India: ${tankers.get('vlcc_me_india',0):,.0f}")
-    st.caption(f"Suezmax WAF→India: ${tankers.get('suezmax_waf_india',0):,.0f}")
-    st.markdown("---")
-    st.caption("© HR Maritime Consultants\nForesight Intelligence Platform\nET AI Hackathon 2026")
+    st.markdown(f"<div class='pill'>🔌 {ALL_API_COUNT} APIs</div><div class='pill'>🤖 Claude AI</div><div class='pill'>📡 Live AIS</div>",unsafe_allow_html=True)
+    st.caption("© Meridian Maritime Intelligence")
 
 # ── HEADER ──
-st.markdown(f"""<div style="background:linear-gradient(135deg,#0d1b2e,#0d6e6e);
-    border-radius:12px;padding:20px 28px;margin-bottom:20px;display:flex;align-items:center;gap:16px;">
-  <div style="font-size:38px;">⚡</div>
+st.markdown(f"""<div style="background:linear-gradient(135deg,#0a1628,#1a3a5c);border-radius:13px;
+    padding:20px 28px;margin-bottom:20px;display:flex;align-items:center;gap:16px;">
+  <div style="font-size:36px;">🧭</div>
   <div>
-    <div style="font-size:22px;font-weight:800;color:#fff;">EnergyShield AI × Foresight Live</div>
-    <div style="font-size:12px;color:rgba(255,255,255,0.65);margin-top:3px;">
-      India Energy Supply Chain Resilience Platform &nbsp;·&nbsp; ET AI Hackathon 2026
-    </div>
+    <div style="font-size:23px;font-weight:800;color:#fff;letter-spacing:1.5px;">MERIDIAN</div>
+    <div style="font-size:12px;color:rgba(255,255,255,0.65);">Maritime Intelligence Platform · Vessel Tracking · Voyage Risk · Energy Resilience</div>
   </div>
   <div style="margin-left:auto;text-align:right;">
-    <div style="font-size:10px;color:rgba(255,255,255,0.5);">INTELLIGENCE ACTIVE</div>
-    <div style="font-size:13px;color:#c8a14b;font-weight:700;">{datetime.utcnow().strftime('%d %b %Y %H:%M')} UTC</div>
+    <div style="font-size:10px;color:rgba(255,255,255,0.5);">● LIVE · {ALL_API_COUNT} DATA SOURCES</div>
+    <div style="font-size:13px;color:#cda94e;font-weight:700;">{datetime.utcnow().strftime('%d %b %Y · %H:%M')} UTC</div>
   </div>
-</div>""", unsafe_allow_html=True)
+</div>""",unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════
-# COMMAND CENTRE
-# ══════════════════════════════════════════
-if page == "🏠 Command Centre":
-    c1,c2,c3,c4,c5,c6 = st.columns(6)
-    with c1: st.metric("🛢️ India Imports","5.1 MBPD","total daily")
-    with c2: st.metric("⚠️ Hormuz Dep.","42%","of imports")
-    with c3: st.metric("🔴 Red Sea","HIGH RISK","3 incidents/7d")
-    with c4: st.metric("🏛️ SPR Cover","9.5 days","88% full")
-    with c5: st.metric("💰 Brent",f"${bp}/bbl",f"{'+' if bc>=0 else ''}{bc:.1f}%")
-    with c6: st.metric("🚢 VLCC Rate",f"${tankers.get('vlcc_me_india',35000):,.0f}/d","ME→India")
+# ════════ COMMAND CENTRE ════════
+if page=="📊 Command Centre":
+    c=st.columns(6)
+    c[0].metric("🛢️ India Imports","5.1 MBPD")
+    c[1].metric("⚠️ Hormuz Dep.","42%")
+    c[2].metric("🔴 Red Sea","HIGH")
+    c[3].metric("🏛️ SPR Cover","9.5 days")
+    c[4].metric("💰 Brent",f"${bp}",f"{'+' if bc>=0 else ''}{bc:.1f}%")
+    c[5].metric("💱 USD/INR",f"₹{fx.get('USD_INR','—')}")
     st.markdown("---")
-
-    col1,col2 = st.columns([3,2])
-    with col1:
-        hdr("📈 Brent Crude — 90-Day Live Price History")
-        df = get_brent_history_live(90)
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=df.index, y=df["brent_usd"],
-            fill="tozeroy", fillcolor="rgba(13,110,110,0.1)",
-            line=dict(color="#0d6e6e",width=2.5), name="Brent USD/bbl"))
-        fig.add_vline(x=df.index[-15], line_dash="dash", line_color="#c62828",
-            annotation_text="Hormuz Exercise", annotation_font_color="#c62828", annotation_font_size=10)
-        fig.add_vline(x=df.index[-30], line_dash="dot", line_color="#e65100",
-            annotation_text="Houthi strike", annotation_font_color="#e65100", annotation_font_size=10)
-        fig.update_layout(paper_bgcolor="#fff",plot_bgcolor="#fff",font_color="#1a2332",
-            height=280,margin=dict(l=0,r=0,t=20,b=0),
-            xaxis=dict(gridcolor="#f0f0f0"),yaxis=dict(gridcolor="#f0f0f0",title="USD/bbl"),showlegend=False)
-        st.plotly_chart(fig, use_container_width=True)
-
-    with col2:
-        hdr("🌐 Corridor Risk Index")
-        scores = {"Hormuz":78,"Red Sea":85,"Gulf of Guinea":65,"Cape (Alt)":22}
-        fig2 = go.Figure(go.Bar(
-            x=list(scores.values()), y=list(scores.keys()), orientation="h",
-            marker_color=["#c62828","#b71c1c","#e65100","#2e7d32"],
-            text=[f"{v}/100" for v in scores.values()], textposition="outside",
-            textfont=dict(color="#1a2332",size=12)
-        ))
-        fig2.update_layout(paper_bgcolor="#fff",plot_bgcolor="#fff",font_color="#1a2332",
-            height=280,margin=dict(l=0,r=50,t=20,b=0),
-            xaxis=dict(range=[0,115],showgrid=False,showticklabels=False),
-            yaxis=dict(gridcolor="#f0f0f0"))
-        st.plotly_chart(fig2, use_container_width=True)
-
+    cl1,cl2=st.columns([3,2])
+    with cl1:
+        hdr("📈 BRENT CRUDE · 90-DAY LIVE PRICE HISTORY")
+        df=get_brent_history_live(90)
+        fig=go.Figure()
+        fig.add_trace(go.Scatter(x=df.index,y=df["brent_usd"],fill="tozeroy",
+            fillcolor="rgba(26,58,92,0.1)",line=dict(color="#1a3a5c",width=2.5)))
+        fig.add_vline(x=df.index[-15],line_dash="dash",line_color="#c62828",annotation_text="Hormuz",annotation_font_size=9)
+        fig.add_vline(x=df.index[-30],line_dash="dot",line_color="#e65100",annotation_text="Houthi strike",annotation_font_size=9)
+        fig.update_layout(paper_bgcolor="#fff",plot_bgcolor="#fff",font_color="#0f1c2e",height=270,
+            margin=dict(l=0,r=0,t=20,b=0),xaxis=dict(gridcolor="#eef2f7"),yaxis=dict(gridcolor="#eef2f7",title="USD/bbl"),showlegend=False)
+        st.plotly_chart(fig,use_container_width=True)
+    with cl2:
+        hdr("🌐 CORRIDOR RISK INDEX")
+        sc={"Hormuz":78,"Red Sea":85,"G. of Guinea":65,"Malacca":40,"Cape":22}
+        fig2=go.Figure(go.Bar(x=list(sc.values()),y=list(sc.keys()),orientation="h",
+            marker_color=["#c62828","#8b0000","#e65100","#ef9a00","#2e7d32"],
+            text=[f"{v}" for v in sc.values()],textposition="outside"))
+        fig2.update_layout(paper_bgcolor="#fff",plot_bgcolor="#fff",font_color="#0f1c2e",height=270,
+            margin=dict(l=0,r=40,t=20,b=0),xaxis=dict(range=[0,110],showticklabels=False,showgrid=False),yaxis=dict(gridcolor="#eef2f7"))
+        st.plotly_chart(fig2,use_container_width=True)
     st.markdown("---")
-    col3,col4 = st.columns([3,2])
-    with col3:
-        hdr("📰 Live Geopolitical Intelligence Feed")
-        news = get_live_news(7)
+    cl3,cl4=st.columns([3,2])
+    with cl3:
+        hdr("📰 LIVE GEOPOLITICAL INTELLIGENCE")
+        news=get_gdelt_news(7) or get_live_news(7)
         for h in news:
-            rs = h.get("risk_score",50)
-            b = badge("HIGH" if rs>=75 else "ELEVATED" if rs>=60 else "MODERATE" if rs>=45 else "LOW")
-            st.markdown(f"""<div class="news-row">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-                    <div style="font-size:13px;font-weight:600;flex:1;">{h['title']}</div>
-                    <div style="white-space:nowrap;">{b}</div>
-                </div>
-                <div style="font-size:10px;color:#888;margin-top:4px;">
-                    {h['source']} · {h['published']} · {h.get('corridor','').replace('_',' ').title()}
-                </div>
-            </div>""", unsafe_allow_html=True)
-
-    with col4:
-        hdr("🚢 Vessels At Risk")
+            rs=h.get("risk_score",50)
+            b=badge("HIGH" if rs>=75 else "ELEVATED" if rs>=60 else "MODERATE" if rs>=45 else "LOW")
+            st.markdown(f"""<div class="news-row"><div style="display:flex;justify-content:space-between;gap:8px;">
+                <div style="font-size:13px;font-weight:600;flex:1;">{h['title'][:110]}</div><div>{b}</div></div>
+                <div style="font-size:10px;color:#8090a0;margin-top:3px;">{h['source']} · {h['published']}</div></div>""",unsafe_allow_html=True)
+    with cl4:
+        hdr("🚨 VESSELS AT RISK")
         for v in ais_tracker.get_at_risk_vessels():
-            rc2 = RC.get("HIGH","#c62828")
-            st.markdown(f"""<div class="vessel-card">
-                <div style="font-size:13px;font-weight:700;color:#0d6e6e;">{v['icon']} {v['name']}</div>
-                <div style="font-size:11px;color:#666;margin-top:2px;">{v['type']} · {v['cargo'][:30]}</div>
-                <div style="font-size:11px;color:{rc2};margin-top:3px;font-weight:600;">⚠ {v['status']}</div>
-                <div style="font-size:10px;color:#999;">→ {v['destination']}</div>
-            </div>""", unsafe_allow_html=True)
-
-        hdr("🌊 Port Incidents (UKMTO/ICC)")
+            st.markdown(f"""<div class="vcard"><div style="font-size:13px;font-weight:700;color:#1a3a5c;">{v['icon']} {v['name']}</div>
+                <div style="font-size:11px;color:#667;">{v['type']} · {v['cargo'][:28]}</div>
+                <div style="font-size:11px;color:#c62828;font-weight:600;">⚠ {v['status']}</div></div>""",unsafe_allow_html=True)
+        hdr("🌊 PORT INCIDENTS")
         for inc in get_port_intelligence()[:3]:
-            rs = inc.get("risk_score",50)
-            rc2 = RC.get("HIGH" if rs>=75 else "MODERATE","#e65100")
-            st.markdown(f"""<div style="border-left:3px solid {rc2};padding:6px 10px;
-                background:#fff;border-radius:0 4px 4px 0;margin-bottom:5px;">
-                <div style="font-size:11px;font-weight:600;">{inc['title'][:65]}</div>
-                <div style="font-size:10px;color:#888;">{inc['source']} · {inc['published']}</div>
-            </div>""", unsafe_allow_html=True)
+            st.markdown(f"""<div style="border-left:3px solid #e65100;padding:6px 10px;background:#fff;border-radius:0 5px 5px 0;margin-bottom:5px;">
+                <div style="font-size:11px;font-weight:600;">{inc['title'][:60]}</div>
+                <div style="font-size:10px;color:#8090a0;">{inc['source']} · {inc['published']}</div></div>""",unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════
-# FORESIGHT LIVE
-# ══════════════════════════════════════════
-elif page == "🛡️ Foresight Live":
-    st.markdown("""<div class="gold-card">
-        <div style="display:flex;align-items:center;gap:12px;">
-            <div style="font-size:30px;">🛡️</div>
-            <div>
-                <div style="font-size:15px;font-weight:800;color:#0d6e6e;">Foresight Live — Vessel Intelligence Terminal</div>
-                <div style="font-size:11px;color:#666;margin-top:2px;">
-                    Live AIS tracking · Corridor threat scoring · Sanctions screening · One-click branded VRA PDF<br>
-                    <b>The intelligence layer that costs $50K+/yr from Windward — built for shipowners who need answers, not enterprise contracts.</b>
-                </div>
-            </div>
-        </div>
-    </div>""", unsafe_allow_html=True)
-
-    cs, cb = st.columns([5,1])
+# ════════ VESSEL LOOKUP ════════
+elif page=="🔎 Vessel Lookup":
+    st.markdown("""<div class="gold"><div style="display:flex;align-items:center;gap:12px;">
+        <div style="font-size:28px;">🔎</div><div>
+        <div style="font-size:15px;font-weight:800;color:#1a3a5c;">Universal Vessel Lookup</div>
+        <div style="font-size:11px;color:#667;">Enter ANY IMO, MMSI, or vessel name. Live AIS data across 8 providers with deep particulars, position, compliance and carbon intelligence.</div>
+        </div></div></div>""",unsafe_allow_html=True)
+    cs,cb=st.columns([5,1])
     with cs:
-        query = st.text_input("", placeholder="Enter IMO number (e.g. 9839131) or vessel name (e.g. FALCON MAJESTIC)", label_visibility="collapsed")
+        q=st.text_input("",placeholder="IMO (e.g. 9839131) · MMSI · or vessel name (e.g. MAERSK)",label_visibility="collapsed")
     with cb:
-        do_search = st.button("🔍 Track", use_container_width=True)
-
-    st.markdown("**Quick-load demo fleet:**")
-    fleet = vessel_intel.get_demo_fleet()
-    fc = st.columns(len(fleet))
+        go_s=st.button("🔍 Lookup",use_container_width=True)
+    st.markdown("**Demo fleet:**")
+    fleet=vessel_intel.get_demo_fleet()
+    fcols=st.columns(len(fleet))
     for i,v in enumerate(fleet):
-        short = v["name"].replace("MV ","").replace("MT ","")[:14]
-        if fc[i].button(short, key=f"f{i}", use_container_width=True):
-            st.session_state["flv"] = v
-            st.session_state.pop("flvra",None)
-
-    if do_search and query:
-        found = vessel_intel.lookup_vessel(query)
-        if found:
-            st.session_state["flv"] = found
-            st.session_state.pop("flvra",None)
-        else:
-            st.error(f"Vessel not found for '{query}'. Try IMO 9745372 or name RED SEA TRADER.")
-
-    if "flv" in st.session_state:
-        v = st.session_state["flv"]
-        risk = vessel_intel.quick_risk_score(v)
-        rc2  = RC.get(risk["level"],"#e65100")
-        rbg  = BG.get(risk["level"],"#fff3e0")
-        icon = v.get("_icon","🚢")
-
-        st.markdown(f"""<div style="background:linear-gradient(135deg,#0d1b2e,#1a3a5f);
-            border:2px solid {rc2};border-radius:10px;padding:18px 22px;margin:12px 0;">
+        if fcols[i].button(v["name"].replace("MV ","").replace("MT ","")[:13],key=f"vl{i}",use_container_width=True):
+            st.session_state["vl"]=v
+    if go_s and q:
+        found=vessel_intel.lookup_vessel(q)
+        if found: st.session_state["vl"]=found
+        else: st.error(f"No vessel found for '{q}'.")
+    if "vl" in st.session_state:
+        v=st.session_state["vl"]; risk=v.get("_risk",vessel_intel.quick_risk_score(v))
+        rc=RC.get(risk["level"],"#e65100"); icon=v.get("_icon","🚢")
+        if v.get("_synthesised"):
+            st.warning("⚠️ No live AIS key configured — showing a synthesised profile. Add VESSELAPI_KEY (free at vesselapi.com) in .env for real data on any IMO.")
+        st.markdown(f"""<div style="background:linear-gradient(135deg,#0a1628,#1a3a5c);border:2px solid {rc};
+            border-radius:11px;padding:18px 22px;margin:12px 0;">
             <div style="display:flex;justify-content:space-between;align-items:center;">
-                <div>
-                    <div style="font-size:20px;font-weight:800;color:#fff;">{icon} {v['name']}</div>
-                    <div style="font-size:11px;color:#90a4ae;margin-top:3px;">
-                        IMO {v['imo']} &nbsp;·&nbsp; {v['type']} &nbsp;·&nbsp; {v.get('flag','—')} flag &nbsp;·&nbsp; {v.get('dwt','—')} DWT &nbsp;·&nbsp; Built {v.get('built') or v.get('year_built','—')}
-                    </div>
-                    <div style="font-size:12px;color:#b0bec5;margin-top:4px;">📍 {v.get('current_route','—')}</div>
-                </div>
-                <div style="background:{rc2};padding:12px 20px;border-radius:8px;text-align:center;min-width:90px;">
-                    <div style="font-size:9px;color:rgba(255,255,255,0.8);">VOYAGE RISK</div>
-                    <div style="font-size:30px;font-weight:900;color:#fff;line-height:1.1;">{risk['score']}</div>
-                    <div style="font-size:11px;color:#fff;font-weight:700;">{risk['level']}</div>
-                </div>
-            </div>
-        </div>""", unsafe_allow_html=True)
-
-        m1,m2,m3,m4,m5 = st.columns(5)
-        with m1: st.metric("⚡ Speed",f"{v.get('speed_kts','—')} kts")
-        with m2: st.metric("🧭 Heading",f"{v.get('heading','—')}°")
-        with m3: st.metric("⚓ Draught",f"{v.get('draught','—')} m")
-        with m4: st.metric("📦 Cargo",(v.get('cargo') or '—')[:16])
-        with m5: st.metric("🕐 ETA",(v.get('eta') or '—')[:10])
-
-        t1,t2,t3,t4 = st.tabs(["📍 Live Map","🔴 Threats","🌊 Weather","🔒 Compliance"])
-
+                <div><div style="font-size:21px;font-weight:800;color:#fff;">{icon} {v['name']}</div>
+                <div style="font-size:11px;color:#9bb3cc;margin-top:3px;">IMO {v['imo']} · MMSI {v.get('mmsi','—')} · {v['type']} · {v.get('flag','—')} · {v.get('dwt','—')} DWT · Built {v.get('built','—')}</div>
+                <div style="font-size:12px;color:#b8c8da;margin-top:3px;">📍 {v.get('current_route') or v.get('destination','—')} · 📡 {v.get('_source','—')}</div></div>
+                <div style="background:{rc};padding:12px 20px;border-radius:9px;text-align:center;min-width:88px;">
+                <div style="font-size:9px;color:rgba(255,255,255,0.85);">RISK</div>
+                <div style="font-size:30px;font-weight:900;color:#fff;line-height:1;">{risk['score']}</div>
+                <div style="font-size:11px;color:#fff;font-weight:700;">{risk['level']}</div></div></div></div>""",unsafe_allow_html=True)
+        mc=st.columns(6)
+        mc[0].metric("⚡ Speed",f"{v.get('speed_kts','—')} kt")
+        mc[1].metric("🧭 Heading",f"{v.get('heading','—')}°")
+        mc[2].metric("⚓ Draught",f"{v.get('draught','—')} m")
+        mc[3].metric("📏 LOA",f"{v.get('loa','—')} m")
+        mc[4].metric("🏷️ Class",v.get('class_society','—')[:10])
+        mc[5].metric("🌱 CII",v.get('cii_rating','—'))
+        t1,t2,t3,t4,t5=st.tabs(["📍 Position & Track","📋 Particulars","🌊 Weather","🔒 Compliance","🌱 Carbon"])
         with t1:
-            vm = folium.Map(location=[v["lat"],v["lon"]], zoom_start=5, tiles="CartoDB Positron")
-            zones = {
-                "strait_of_hormuz":([26.57,56.25],80,"#c62828","Hormuz — HIGH RISK"),
-                "red_sea":([14.5,43.0],90,"#c62828","Red Sea — HIGH RISK"),
-                "gulf_of_guinea":([2.5,2.5],70,"#e65100","Gulf of Guinea — ELEVATED"),
-                "arabian_sea":([18.0,64.0],40,"#1976d2","Arabian Sea — MODERATE"),
-            }
-            for ck,(cc,cr,ccol,clbl) in zones.items():
-                folium.CircleMarker(cc,radius=cr,color=ccol,fill=True,fill_opacity=0.08,
-                    weight=2,popup=clbl).add_to(vm)
-                folium.Marker(cc,icon=folium.DivIcon(html=f'<div style="background:{ccol};color:#fff;padding:2px 6px;border-radius:4px;font-size:9px;font-weight:700;white-space:nowrap;">{clbl}</div>')).add_to(vm)
+            vm=folium.Map(location=[v["lat"],v["lon"]],zoom_start=5,tiles="CartoDB Positron")
+            track=get_vessel_track_history(v["imo"],v["lat"],v["lon"])
+            folium.PolyLine(track,color=rc,weight=2.5,opacity=0.6,dash_array="5").add_to(vm)
+            for ck,cc,col,lb in [("strait_of_hormuz",[26.57,56.25],"#c62828","Hormuz HRA"),("red_sea",[14.5,43.0],"#c62828","Red Sea HRA"),("gulf_of_guinea",[2.5,2.5],"#e65100","G.Guinea HRA"),("arabian_sea",[18,64],"#1976d2","Arabian Sea")]:
+                folium.CircleMarker(cc,radius=28,color=col,fill=True,fill_opacity=0.07,weight=2,popup=lb).add_to(vm)
             for r in INDIA_REFINERIES:
-                folium.CircleMarker([r["lat"],r["lon"]],radius=7,color="#0d6e6e",fill=True,
-                    fill_opacity=0.8,popup=f"🏭 {r['name']} — {r['capacity_mbpd']} MBPD").add_to(vm)
-            folium.Marker([v["lat"],v["lon"]],
-                icon=folium.DivIcon(html=f'<div style="font-size:20px;">{icon}</div>'),
-                popup=f"<b>{v['name']}</b><br>IMO: {v['imo']}<br>{v.get('status','')}"
-            ).add_to(vm)
-            folium.CircleMarker([v["lat"],v["lon"]],radius=12,color=rc2,fill=True,fill_opacity=0.4,weight=2).add_to(vm)
-            st_folium(vm, width=None, height=420, key="flmap")
-
+                folium.CircleMarker([r["lat"],r["lon"]],radius=6,color="#1a3a5c",fill=True,fill_opacity=0.8,popup=f"🏭 {r['name']}").add_to(vm)
+            folium.Marker([v["lat"],v["lon"]],icon=folium.DivIcon(html=f'<div style="font-size:22px;">{icon}</div>'),popup=f"<b>{v['name']}</b><br>{v.get('status','')}").add_to(vm)
+            folium.CircleMarker([v["lat"],v["lon"]],radius=11,color=rc,fill=True,fill_opacity=0.4).add_to(vm)
+            st_folium(vm,width=None,height=420,key="vlmap")
+            st.caption(f"Dashed line = simulated 24h track · 🏭 = Indian refineries · Shaded zones = High Risk Areas")
         with t2:
-            corridor_key = v.get("corridor","")
-            corr = CORRIDORS.get(corridor_key,{})
-            threat_map = {
-                "Piracy / Armed Robbery":    {"strait_of_hormuz":"LOW","red_sea":"MODERATE","gulf_of_guinea":"HIGH","arabian_sea":"LOW"},
-                "Geopolitical / Military":   {"strait_of_hormuz":"HIGH","red_sea":"HIGH","gulf_of_guinea":"LOW","arabian_sea":"LOW"},
-                "Drone / Missile Threat":    {"strait_of_hormuz":"ELEVATED","red_sea":"CRITICAL","gulf_of_guinea":"LOW","arabian_sea":"LOW"},
-                "GPS Spoofing / Jamming":    {"strait_of_hormuz":"HIGH","red_sea":"MODERATE","gulf_of_guinea":"LOW","arabian_sea":"LOW"},
-                "Weather / Sea State":       {"strait_of_hormuz":"LOW","red_sea":"LOW","gulf_of_guinea":"MODERATE","arabian_sea":"LOW"},
-            }
-            threat_detail = {
-                "Piracy / Armed Robbery":    {"strait_of_hormuz":"Minimal piracy risk on this corridor","red_sea":"Residual Somali piracy risk in GoA approaches","gulf_of_guinea":"Active kidnap-for-ransom operations. IMB HRA in effect.","arabian_sea":"Low residual Somali piracy risk"},
-                "Geopolitical / Military":   {"strait_of_hormuz":"IRGC naval exercise ongoing. US sanctions pressure elevated.","red_sea":"Active Houthi anti-ship operations. Multiple vessels struck.","gulf_of_guinea":"No current state-level threat","arabian_sea":"No direct military threat on this route"},
-                "Drone / Missile Threat":    {"strait_of_hormuz":"IRGC drone capability confirmed. Elevated alert.","red_sea":"CRITICAL — Houthi AShM and drone strikes ongoing June 2026","gulf_of_guinea":"Not applicable on this corridor","arabian_sea":"Outside current Houthi engagement envelope"},
-                "GPS Spoofing / Jamming":    {"strait_of_hormuz":"GPS jamming reported — 11,600+ vessels affected Q1 2026","red_sea":"Intermittent interference reported","gulf_of_guinea":"Not reported","arabian_sea":"Minimal"},
-                "Weather / Sea State":       {"strait_of_hormuz":"Favourable conditions expected","red_sea":"Favourable — SW monsoon onset","gulf_of_guinea":"Moderate swell. SW monsoon active.","arabian_sea":"SW monsoon. Moderate-rough seas possible."},
-            }
-            for threat,lvl_map in threat_map.items():
-                lvl = lvl_map.get(corridor_key,"MODERATE")
-                detail = threat_detail.get(threat,{}).get(corridor_key,"—")
-                tc = RC.get(lvl,"#888")
-                tbg = BG.get(lvl,"#f5f5f5")
-                st.markdown(f"""<div style="background:{tbg};border-radius:6px;border-left:4px solid {tc};
-                    padding:10px 14px;margin-bottom:6px;display:flex;align-items:center;gap:12px;">
-                    <div style="flex:1;">
-                        <div style="font-size:13px;font-weight:600;">{threat}</div>
-                        <div style="font-size:11px;color:#555;margin-top:3px;">{detail}</div>
-                    </div>
-                    <div style="background:{tc};color:#fff;padding:3px 12px;border-radius:12px;font-size:11px;font-weight:700;white-space:nowrap;">{lvl}</div>
-                </div>""", unsafe_allow_html=True)
-            if corr:
-                st.info(f"**{corr.get('name','—')}** | HRA: {'✅ Yes' if corr.get('hra') else '—'} | BMP5: {'✅ Applicable' if corr.get('bmp5_applicable') else '—'} | UKMTO: {'✅ Register' if corr.get('ukmto_area') else '—'}")
-
+            pc=st.columns(2)
+            with pc[0]:
+                st.markdown(f"""**Identity**
+- IMO: `{v.get('imo','—')}`
+- MMSI: `{v.get('mmsi','—')}`
+- Call Sign: `{v.get('callsign','—')}`
+- Name: **{v.get('name','—')}**
+- Flag: {v.get('flag','—')}
+- Type: {v.get('type','—')}""")
+            with pc[1]:
+                st.markdown(f"""**Dimensions & Ownership**
+- DWT: {v.get('dwt','—')} t
+- GT: {v.get('gt','—')} t
+- LOA × Beam: {v.get('loa','—')} × {v.get('beam','—')} m
+- Built: {v.get('built','—')}
+- Owner: {v.get('owner','—')}
+- Manager: {v.get('manager','—')}
+- Class: {v.get('class_society','—')}""")
         with t3:
-            from utils.live_data import get_route_weather
-            wx = get_route_weather(v.get("lat",15), v.get("lon",60))
-            wc1,wc2,wc3,wc4 = st.columns(4)
-            with wc1: st.metric("🌊 Wave Height",f"{wx.get('wave_height_m','—')} m")
-            with wc2: st.metric("⏱ Wave Period",f"{wx.get('wave_period_s','—')} s")
-            with wc3: st.metric("💨 Wind Speed",f"{wx.get('wind_speed_kts','—')} kts")
-            with wc4: st.metric("🌊 Sea State",wx.get('sea_state','—'))
-            st.caption(f"📡 Source: {wx.get('source','—')} · Updated: {wx.get('_ts','')[:16]} UTC")
-
+            wx=get_route_weather(float(v.get("lat") or 15),float(v.get("lon") or 60))
+            wc=st.columns(4)
+            wc[0].metric("🌊 Wave Ht",f"{wx.get('wave_height_m','—')} m")
+            wc[1].metric("⏱ Period",f"{wx.get('wave_period_s','—')} s")
+            wc[2].metric("💨 Wind",f"{wx.get('wind_speed_kts','—')} kt")
+            wc[3].metric("🌊 Sea State",wx.get('sea_state','—'))
+            st.caption(f"📡 {wx.get('source','—')} · {wx.get('_ts','')[:16]} UTC")
         with t4:
-            from utils.live_data import check_sanctions_live
-            sc = check_sanctions_live(v.get("imo",""),v.get("name",""))
-            is_clear = sc.get("status","") == "CLEAR"
-            scol = "#2e7d32" if is_clear else "#c62828"
-            sbg  = "#f1f8e9" if is_clear else "#ffebee"
-            st.markdown(f"""<div style="background:{sbg};border:2px solid {scol};
-                border-radius:8px;padding:16px 20px;margin-bottom:12px;">
-                <div style="font-size:16px;font-weight:800;color:{scol};">
-                    {'✅ CLEAR' if is_clear else '🚨 '+sc.get('status','')}
-                </div>
-                <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                    <div style="font-size:11px;"><b>Screened against:</b><br>{'<br>'.join(sc.get('screened_against',[]))}</div>
-                    <div style="font-size:11px;">
-                        <b>Flag risk:</b> {sc.get('flag_risk','—')}<br>
-                        <b>AIS history:</b> {sc.get('ais_gap_history','—')}<br>
-                        <b>Ownership opacity:</b> {sc.get('ownership_opacity','—')}<br>
-                        <b>Screened:</b> {sc.get('_ts','')[:16]} UTC
-                    </div>
-                </div>
-            </div>""", unsafe_allow_html=True)
-            if sc.get("matches"):
-                st.error(f"⚠️ Sanctions matches found: {sc['matches']}")
-
-        # VRA GENERATOR
+            sc=check_sanctions_live(v.get("imo",""),v.get("name",""))
+            clear=sc.get("status","")=="CLEAR"; scol="#2e7d32" if clear else "#c62828"
+            st.markdown(f"""<div style="background:{'#e9f6ea' if clear else '#fde8e8'};border:2px solid {scol};border-radius:9px;padding:16px 20px;">
+                <div style="font-size:16px;font-weight:800;color:{scol};">{'✅ CLEAR' if clear else '🚨 '+sc.get('status','')}</div>
+                <div style="margin-top:10px;font-size:11px;color:#445;">
+                <b>Screened:</b> {', '.join(sc.get('screened_against',[]))}<br>
+                <b>Flag risk:</b> {sc.get('flag_risk','—')}<br>
+                <b>AIS history:</b> {sc.get('ais_gap_history','—')}<br>
+                <b>Ownership opacity:</b> {sc.get('ownership_opacity','—')}</div></div>""",unsafe_allow_html=True)
+        with t5:
+            cii=v.get("cii_rating","C")
+            ccolor={"A":"#2e7d32","B":"#7cb342","C":"#ef9a00","D":"#e65100","E":"#c62828"}.get(cii,"#ef9a00")
+            cc=st.columns(2)
+            with cc[0]:
+                st.markdown(f"""<div style="text-align:center;padding:20px;background:#fff;border:2px solid {ccolor};border-radius:10px;">
+                    <div style="font-size:11px;color:#667;">CII RATING (IMO)</div>
+                    <div style="font-size:48px;font-weight:900;color:{ccolor};">{cii}</div>
+                    <div style="font-size:11px;color:#667;">Carbon Intensity Indicator</div></div>""",unsafe_allow_html=True)
+            with cc[1]:
+                st.markdown(f"""**Environmental Profile**
+- CII Rating: **{cii}** ({'Superior' if cii in 'AB' else 'Compliant' if cii=='C' else 'Action required'})
+- EEXI: Compliant (estimated)
+- Annual CO₂: ~{v.get('dwt',50000)//1000 * 12:,} t (estimated)
+- IMO 2030 target: {'On track' if cii in 'ABC' else 'At risk'}
+- Scrubber: {'Likely fitted' if v.get('built',2015)>=2018 else 'Verify'}""")
         st.markdown("---")
-        st.markdown("### 📄 One-Click Voyage Risk Assessment")
-        st.markdown("""<div class="gold-card" style="font-size:12px;">
-            💡 <b>The deliverable shipowners pay for.</b> AI-generated Foresight-branded VRA PDF in ~30 seconds
-            — signed by Capt. Ritesh Kapoor, ready to email to charterers, P&I clubs, or war risk underwriters.
-            <br><b>Requires: ANTHROPIC_API_KEY in .env</b>
-        </div>""", unsafe_allow_html=True)
-
-        if st.button("⚡ Generate Foresight VRA (Branded PDF)", use_container_width=True, type="primary"):
-            with st.spinner("🤖 Foresight analyst generating voyage risk assessment..."):
-                try:
-                    vra = vessel_intel.generate_vra(v)
-                    st.session_state["flvra"] = vra
-                except Exception as e:
-                    st.error(f"Error: {e}. Check ANTHROPIC_API_KEY in .env file.")
-
-        if "flvra" in st.session_state:
-            vra = st.session_state["flvra"]
-            if "error" not in vra and vra.get("overall_risk_rating"):
-                rating = vra.get("overall_risk_rating","MODERATE")
-                score  = vra.get("risk_score",50)
-                vc2 = RC.get(rating,"#e65100")
-                vbg2= BG.get(rating,"#fff3e0")
-                st.markdown(f"""<div style="background:{vbg2};border-left:5px solid {vc2};
-                    border-radius:0 8px 8px 0;padding:14px 18px;margin:10px 0;">
-                    <div style="font-size:14px;font-weight:800;color:{vc2};">
-                        {vra.get('vessel_name','')} — {rating} RISK ({score}/100)
-                    </div>
-                    <div style="font-size:12px;color:#444;margin-top:6px;line-height:1.6;">
-                        {vra.get('executive_summary','')}
-                    </div>
-                </div>""", unsafe_allow_html=True)
-
-                threats = vra.get("threat_assessment",{})
-                labels = {"piracy_armed_robbery":"Piracy","geopolitical_military":"Geo/Military",
-                         "drone_missile_threat":"Drone/Missile","gps_spoofing_jamming":"GPS Jamming","sea_state_weather":"Weather"}
-                tcols = st.columns(len(labels))
-                for i,(k,lbl) in enumerate(labels.items()):
-                    if k in threats:
-                        lvl = threats[k].get("level","—")
-                        lc2 = RC.get(lvl,"#888")
-                        lbg2= BG.get(lvl,"#f5f5f5")
-                        with tcols[i]:
-                            st.markdown(f"""<div style="text-align:center;padding:8px 4px;
-                                background:{lbg2};border-radius:6px;border:1px solid {lc2};">
-                                <div style="font-size:9px;color:#666;font-weight:600;">{lbl}</div>
-                                <div style="font-size:11px;color:{lc2};font-weight:800;margin-top:4px;">{lvl}</div>
-                            </div>""", unsafe_allow_html=True)
-
-                # Generate PDF
-                with st.spinner("Building PDF..."):
-                    pdf_path = os.path.join(tempfile.gettempdir(),f"Foresight_VRA_{v.get('imo','')}.pdf")
-                    try:
-                        generate_vra_pdf(vra, pdf_path)
-                        with open(pdf_path,"rb") as f:
-                            st.download_button(
-                                "⬇️ Download Foresight VRA (Branded PDF)",
-                                data=f.read(),
-                                file_name=f"Foresight_VRA_{v['name'].replace(' ','_')}.pdf",
-                                mime="application/pdf",
-                                use_container_width=True
-                            )
-                    except Exception as e:
-                        st.error(f"PDF error: {e}")
-
-                with st.expander("📋 Full Recommendations, Chokepoints & Insurance"):
-                    c1v,c2v = st.columns(2)
-                    with c1v:
-                        st.markdown("**Operational Recommendations**")
-                        for r in vra.get("recommendations",[]):
-                            st.markdown(f"▸ {r}")
-                        st.markdown("**Ship Hardening (BMP5)**")
-                        for h in vra.get("hardening_measures",[]):
-                            st.markdown(f"• {h}")
-                    with c2v:
-                        st.markdown("**Chokepoint Advisories**")
-                        for cp in vra.get("chokepoints",[]):
-                            lc2 = RC.get(cp.get("risk",""),"#888")
-                            st.markdown(f"**{cp.get('name','')}** — {cp.get('advisory','')}")
-                        st.markdown("**Reporting Requirements**")
-                        for rr in vra.get("reporting_requirements",[]):
-                            st.markdown(f"• {rr}")
-                    st.markdown("**War Risk / Insurance**")
-                    st.info(vra.get("insurance_note","—"))
-            elif "error" in vra:
-                st.error(f"VRA failed: {vra.get('error')}. Ensure ANTHROPIC_API_KEY is set in .env")
-
+        if st.button("🛡️ Generate Voyage Risk Assessment for this vessel →",use_container_width=True,type="primary"):
+            st.session_state["vra_vessel"]=v
+            st.session_state["_goto_vra"]=True
+            st.rerun()
     else:
-        st.markdown("""<div style="background:#fff;border:2px dashed #c8a14b;border-radius:10px;
-            padding:40px;text-align:center;margin-top:20px;">
-            <div style="font-size:48px;">🛡️</div>
-            <div style="font-size:16px;font-weight:700;color:#0d6e6e;margin-top:12px;">Enter IMO or vessel name above, or tap a demo vessel</div>
-            <div style="font-size:12px;color:#666;margin-top:8px;">
-                Live AIS position · Corridor threat scoring · 5-list sanctions screening ·
-                Marine weather · One-click branded VRA PDF
-            </div>
-        </div>""", unsafe_allow_html=True)
+        st.markdown("""<div style="background:#fff;border:2px dashed #cda94e;border-radius:11px;padding:40px;text-align:center;margin-top:18px;">
+            <div style="font-size:46px;">🔎</div>
+            <div style="font-size:16px;font-weight:700;color:#1a3a5c;margin-top:10px;">Look up any vessel worldwide</div>
+            <div style="font-size:12px;color:#667;margin-top:6px;">IMO · MMSI · or name — deep particulars, live position, compliance & carbon intelligence</div></div>""",unsafe_allow_html=True)
 
 
-# ══════════════════════════════════════════
-# RISK INTELLIGENCE
-# ══════════════════════════════════════════
-elif page == "🌍 Risk Intelligence":
-    hdr("🤖 GeoSentinel Agent — Live Corridor Risk Assessment")
-    c1,c2 = st.columns([1,3])
-    with c1:
-        run_btn = st.button("▶ Run GeoSentinel Agent", use_container_width=True)
-    with c2:
-        st.info("Fuses live news feeds, commodity prices, and AIS data to score corridor disruption risk in real time using Claude AI.")
+# ════════ VOYAGE RISK ASSESSMENT ════════
+elif page=="🛡️ Voyage Risk Assessment":
+    hdr("🛡️ MERIDIAN VOYAGE RISK ASSESSMENT")
+    src=st.session_state.get("vra_vessel") or st.session_state.get("vl")
+    cs,cb=st.columns([5,1])
+    with cs:
+        q=st.text_input("",value=src["imo"] if src else "",placeholder="IMO / MMSI / name",label_visibility="collapsed")
+    with cb:
+        ld=st.button("Load",use_container_width=True)
+    if ld and q:
+        f=vessel_intel.lookup_vessel(q)
+        if f: src=f; st.session_state["vra_vessel"]=f
+    if src:
+        v=src
+        st.markdown(f"""<div class="card"><b style="font-size:15px;color:#1a3a5c;">{v.get('_icon','🚢')} {v['name']}</b>
+            <span style="color:#667;font-size:12px;"> · IMO {v['imo']} · {v['type']} · {v.get('flag','')} · {v.get('current_route','')}</span></div>""",unsafe_allow_html=True)
+        st.markdown("""<div class="gold" style="font-size:12px;">💡 <b>Professional deliverable.</b> AI-generated Meridian VRA — branded PDF, ready for charterers, P&I clubs, and war-risk underwriters. <b>Requires ANTHROPIC_API_KEY with credits.</b></div>""",unsafe_allow_html=True)
+        if st.button("⚡ Generate Meridian VRA (Branded PDF)",use_container_width=True,type="primary"):
+            with st.spinner("🤖 Meridian analyst generating assessment..."):
+                try:
+                    vra=vessel_intel.generate_vra(v); st.session_state["vra"]=vra
+                except Exception as e:
+                    st.error(f"Error: {e}")
+        if "vra" in st.session_state:
+            vra=st.session_state["vra"]
+            if vra.get("overall_risk_rating"):
+                rt=vra["overall_risk_rating"]; sc2=vra.get("risk_score",50)
+                vc=RC.get(rt,"#e65100"); vb=BGc.get(rt,"#fff3e6")
+                st.markdown(f"""<div style="background:{vb};border-left:5px solid {vc};border-radius:0 9px 9px 0;padding:15px 19px;margin:10px 0;">
+                    <div style="font-size:14px;font-weight:800;color:{vc};">{vra.get('vessel_name','')} — {rt} ({sc2}/100)</div>
+                    <div style="font-size:12px;color:#445;margin-top:6px;line-height:1.6;">{vra.get('executive_summary','')}</div></div>""",unsafe_allow_html=True)
+                th=vra.get("threat_assessment",{})
+                lbls={"piracy_armed_robbery":"Piracy","geopolitical_military":"Geo/Mil","drone_missile_threat":"Drone/Missile","gps_spoofing_jamming":"GPS Jam","sea_state_weather":"Weather"}
+                tcols=st.columns(len(lbls))
+                for i,(k,lb) in enumerate(lbls.items()):
+                    if k in th:
+                        lv=th[k].get("level","—"); lc=RC.get(lv,"#888"); lbg=BGc.get(lv,"#f5f5f5")
+                        tcols[i].markdown(f"""<div style="text-align:center;padding:8px 4px;background:{lbg};border-radius:6px;border:1px solid {lc};">
+                            <div style="font-size:9px;color:#667;font-weight:600;">{lb}</div>
+                            <div style="font-size:11px;color:{lc};font-weight:800;margin-top:3px;">{lv}</div></div>""",unsafe_allow_html=True)
+                pdf=os.path.join(tempfile.gettempdir(),f"Meridian_VRA_{v.get('imo','')}.pdf")
+                try:
+                    generate_vra_pdf(vra,pdf)
+                    with open(pdf,"rb") as f:
+                        st.download_button("⬇️ Download Meridian VRA (PDF)",f.read(),file_name=f"Meridian_VRA_{v['name'].replace(' ','_')}.pdf",mime="application/pdf",use_container_width=True)
+                except Exception as e:
+                    st.error(f"PDF error: {e}")
+                with st.expander("📋 Full Assessment Detail"):
+                    c1,c2=st.columns(2)
+                    with c1:
+                        st.markdown("**Recommendations**")
+                        for r in vra.get("recommendations",[]): st.markdown(f"▸ {r}")
+                        st.markdown("**Hardening (BMP5)**")
+                        for h in vra.get("hardening_measures",[]): st.markdown(f"• {h}")
+                    with c2:
+                        st.markdown("**Chokepoints**")
+                        for cp in vra.get("chokepoints",[]): st.markdown(f"**{cp.get('name','')}** [{cp.get('risk','')}] — {cp.get('advisory','')}")
+                        st.markdown("**Reporting**")
+                        for rr in vra.get("reporting_requirements",[]): st.markdown(f"• {rr}")
+                    st.info(vra.get("insurance_note",""))
+            elif "error" in vra:
+                st.error(f"VRA failed: {vra['error']}")
+    else:
+        st.info("Look up a vessel first (🔎 Vessel Lookup) or enter an IMO above.")
 
-    if run_btn:
-        with st.spinner("🤖 GeoSentinel scanning intelligence feeds..."):
-            try:
-                result = geo_sentinel.run()
-                st.session_state["geo"] = result
-            except Exception as e:
-                st.error(f"Agent error: {e}. Check ANTHROPIC_API_KEY in .env")
 
+# ════════ CORRIDOR RISK INTELLIGENCE ════════
+elif page=="🌍 Corridor Risk Intelligence":
+    hdr("🌍 GEOSENTINEL — LIVE CORRIDOR RISK ASSESSMENT")
+    c1,c2=st.columns([1,3])
+    with c1: run=st.button("▶ Run GeoSentinel",use_container_width=True)
+    with c2: st.info("Fuses live news, commodity prices and AIS data to score corridor disruption risk using Claude AI.")
+    if run:
+        with st.spinner("🤖 Scanning intelligence feeds..."):
+            try: st.session_state["geo"]=geo_sentinel.run()
+            except Exception as e: st.error(f"Error: {e}")
     if "geo" in st.session_state:
-        r = st.session_state["geo"]
+        r=st.session_state["geo"]
         if "error" not in r:
-            c1,c2,c3 = st.columns(3)
-            with c1: st.metric("Overall Risk",r.get("overall_risk_level","—"))
-            with c2: st.metric("Composite Score",f"{r.get('overall_risk_score','—')}/100")
-            with c3: st.metric("Corridors Monitored","4")
+            cc=st.columns(3)
+            cc[0].metric("Overall Risk",r.get("overall_risk_level","—"))
+            cc[1].metric("Composite",f"{r.get('overall_risk_score','—')}/100")
+            cc[2].metric("Corridors","4")
             st.info(r.get("analyst_summary",""))
-
-            corridors = r.get("corridors",{})
-            if corridors:
-                cols = st.columns(len(corridors))
-                for i,(key,data) in enumerate(corridors.items()):
-                    score = data.get("risk_score",0)
-                    level = data.get("risk_level","MODERATE")
-                    col2 = RC.get(level,"#888")
-                    bg2  = BG.get(level,"#f5f5f5")
-                    with cols[i]:
-                        st.markdown(f"""<div style="background:{bg2};border:2px solid {col2};
-                            border-radius:8px;padding:14px;text-align:center;">
-                            <div style="font-size:10px;color:#666;font-weight:600;text-transform:uppercase;">{key.replace('_',' ')}</div>
-                            <div style="font-size:32px;font-weight:900;color:{col2};margin:6px 0;">{score}</div>
-                            <div style="font-size:11px;color:{col2};font-weight:700;">{level}</div>
-                            <div style="font-size:9px;color:#888;margin-top:5px;">{data.get('primary_threat','')[:55]}</div>
-                        </div>""", unsafe_allow_html=True)
-
-            top = r.get("top_3_risks",[])
-            if top:
-                st.markdown("---")
-                hdr("🚨 Top Active Risks")
-                for risk in top:
-                    prob = risk.get("probability",50)
-                    col2 = RC.get("HIGH" if prob>=70 else "ELEVATED","#e65100")
-                    bg2  = BG.get("HIGH" if prob>=70 else "ELEVATED","#fff3e0")
-                    with st.expander(f"#{risk['rank']} — {risk['risk']} (Probability: {prob}%)"):
-                        st.write(risk.get("impact",""))
-        else:
-            st.error(f"Agent error: {r.get('error')}. Check ANTHROPIC_API_KEY in .env")
+            cors=r.get("corridors",{})
+            if cors:
+                ccc=st.columns(len(cors))
+                for i,(k,d) in enumerate(cors.items()):
+                    s=d.get("risk_score",0); lv=d.get("risk_level","MODERATE"); col=RC.get(lv,"#888"); bgg=BGc.get(lv,"#f5f5f5")
+                    ccc[i].markdown(f"""<div style="background:{bgg};border:2px solid {col};border-radius:8px;padding:13px;text-align:center;">
+                        <div style="font-size:10px;color:#667;text-transform:uppercase;">{k.replace('_',' ')}</div>
+                        <div style="font-size:30px;font-weight:900;color:{col};">{s}</div>
+                        <div style="font-size:11px;color:{col};font-weight:700;">{lv}</div></div>""",unsafe_allow_html=True)
+            for risk in r.get("top_3_risks",[]):
+                with st.expander(f"#{risk['rank']} — {risk['risk']} ({risk.get('probability',50)}%)"):
+                    st.write(risk.get("impact",""))
+        else: st.error(f"Error: {r['error']}")
 
 
-# ══════════════════════════════════════════
-# SCENARIO MODELLER
-# ══════════════════════════════════════════
-elif page == "📊 Scenario Modeller":
-    hdr("📊 Disruption Scenario Intelligence Engine")
-    scenarios = scenario_modeller.get_all_scenarios()
-    sel_key = st.selectbox("Select Disruption Scenario",list(scenarios.keys()),
-                           format_func=lambda k:f"{scenarios[k]['icon']} {scenarios[k]['name']}")
-    sel = scenarios[sel_key]
-    c1,c2 = st.columns(2)
-    with c1: st.info(sel["description"])
-    with c2: st.warning(f"Supply reduction: **{sel['supply_reduction_pct']}%** | Duration: **{sel['duration_days']} days**")
-
-    if st.button(f"▶ Model Scenario: {sel['name']}", use_container_width=True):
-        with st.spinner("🤖 Computing cascading economic impacts with Claude AI..."):
-            try:
-                result = scenario_modeller.run(sel_key)
-                st.session_state["sc"] = result
-            except Exception as e:
-                st.error(f"Error: {e}. Check ANTHROPIC_API_KEY in .env")
-
+# ════════ DISRUPTION SCENARIOS ════════
+elif page=="📉 Disruption Scenarios":
+    hdr("📉 DISRUPTION SCENARIO INTELLIGENCE ENGINE")
+    scs=scenario_modeller.get_all_scenarios()
+    sk=st.selectbox("Scenario",list(scs.keys()),format_func=lambda k:f"{scs[k]['icon']} {scs[k]['name']}")
+    sel=scs[sk]
+    c1,c2=st.columns(2)
+    c1.info(sel["description"]); c2.warning(f"Reduction: {sel['supply_reduction_pct']}% · Duration: {sel['duration_days']}d")
+    if st.button(f"▶ Model: {sel['name']}",use_container_width=True):
+        with st.spinner("🤖 Computing cascading impacts..."):
+            try: st.session_state["sc"]=scenario_modeller.run(sk)
+            except Exception as e: st.error(f"Error: {e}")
     if "sc" in st.session_state:
-        r = st.session_state["sc"]
+        r=st.session_state["sc"]
         if "error" not in r:
-            st.markdown("---")
-            st.markdown(f"### {sel['icon']} Impact Analysis — {sel['name']}")
-            c1,c2,c3,c4 = st.columns(4)
-            with c1: st.metric("Supply Gap",f"{r.get('india_supply_gap_mbpd',0):.2f} MBPD")
-            with c2: st.metric("Brent Spike",f"+{r.get('brent_price_spike_estimate_pct',0):.1f}%")
-            with c3: st.metric("Import Bill",f"+${r.get('india_import_bill_increase_usd_bn_monthly',0):.1f}Bn/mo")
-            with c4: st.metric("GDP Impact",f"{r.get('gdp_impact_annualised_pct',0):.2f}% ann.")
-            c1,c2,c3,c4 = st.columns(4)
-            with c1: st.metric("Petrol",f"+₹{r.get('petrol_price_impact_inr_per_litre',0):.1f}/L")
-            with c2: st.metric("Diesel",f"+₹{r.get('diesel_price_impact_inr_per_litre',0):.1f}/L")
-            with c3: st.metric("SPR Cover",f"{r.get('spr_cover_days',9.5):.1f} days")
-            with c4: st.metric("Power Sector",r.get("power_sector_stress_level","—"))
-            st.markdown("---")
-            cl,cr = st.columns(2)
+            cc=st.columns(4)
+            cc[0].metric("Supply Gap",f"{r.get('india_supply_gap_mbpd',0):.2f} MBPD")
+            cc[1].metric("Brent Spike",f"+{r.get('brent_price_spike_estimate_pct',0):.1f}%")
+            cc[2].metric("Import Bill",f"+${r.get('india_import_bill_increase_usd_bn_monthly',0):.1f}Bn/mo")
+            cc[3].metric("GDP",f"{r.get('gdp_impact_annualised_pct',0):.2f}%")
+            cc=st.columns(4)
+            cc[0].metric("Petrol",f"+₹{r.get('petrol_price_impact_inr_per_litre',0):.1f}/L")
+            cc[1].metric("Diesel",f"+₹{r.get('diesel_price_impact_inr_per_litre',0):.1f}/L")
+            cc[2].metric("SPR Cover",f"{r.get('spr_cover_days',9.5):.1f}d")
+            cc[3].metric("Power",r.get("power_sector_stress_level","—"))
+            cl,cr=st.columns(2)
             with cl:
-                hdr("⏱ Response Timeline")
+                hdr("⏱ RESPONSE TIMELINE")
                 for ev in r.get("response_timeline",[]):
-                    st.markdown(f"""<div style="display:flex;gap:10px;margin-bottom:8px;align-items:flex-start;">
-                        <div style="background:#0d6e6e;color:#fff;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;min-width:50px;text-align:center;">Day {ev.get('day','?')}</div>
-                        <div><b style="font-size:12px;">{ev.get('action','')}</b><br>
-                        <span style="font-size:11px;color:#666;">{ev.get('impact','')}</span></div>
-                    </div>""", unsafe_allow_html=True)
+                    st.markdown(f"""<div style="display:flex;gap:10px;margin-bottom:8px;">
+                        <div style="background:#1a3a5c;color:#fff;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap;">Day {ev.get('day','?')}</div>
+                        <div><b style="font-size:12px;">{ev.get('action','')}</b><br><span style="font-size:11px;color:#667;">{ev.get('impact','')}</span></div></div>""",unsafe_allow_html=True)
             with cr:
-                hdr("🛡️ Mitigations")
-                for rec in r.get("mitigation_recommendations",[]): st.markdown(f"✅ {rec}")
-                hdr("⚠️ Vulnerabilities")
-                for vuln in r.get("key_vulnerabilities",[]): st.markdown(f"🔴 {vuln}")
+                hdr("🛡️ MITIGATIONS")
+                for m in r.get("mitigation_recommendations",[]): st.markdown(f"✅ {m}")
+                hdr("⚠️ VULNERABILITIES")
+                for vv in r.get("key_vulnerabilities",[]): st.markdown(f"🔴 {vv}")
             st.info(r.get("scenario_narrative",""))
-        else:
-            st.error(f"Error: {r.get('error')}. Check ANTHROPIC_API_KEY in .env")
+        else: st.error(f"Error: {r['error']}")
 
 
-# ══════════════════════════════════════════
-# AIS TRACKER
-# ══════════════════════════════════════════
-elif page == "🚢 AIS Tracker":
-    hdr("🚢 AIS Maritime Intelligence — India Supply Corridor Tracking")
-    vessels = ais_tracker.get_live_vessels()
-    at_risk = ais_tracker.get_at_risk_vessels()
-    diverting = [v for v in vessels if "DIVERTING" in v["status"] or "ALT ROUTE" in v["status"]]
-    c1,c2,c3,c4 = st.columns(4)
-    with c1: st.metric("Total Tracked",len(vessels))
-    with c2: st.metric("⚠️ At Risk",len(at_risk))
-    with c3: st.metric("🔄 Rerouted Cape",len(diverting))
-    with c4: st.metric("🟢 Normal Transit",len(vessels)-len(at_risk)-len(diverting))
-
-    m = folium.Map(location=[15,60], zoom_start=3, tiles="CartoDB Positron")
-    STATUS_COLORS = {
-        "TRANSITING":"#2e7d32","TRANSITING — ALT ROUTE":"#388e3c",
-        "ANCHORED — AWAITING CLEARANCE":"#e65100","DELAYED — RISK ASSESSMENT":"#c62828",
-        "DIVERTING — CAPE ROUTE":"#f57f17","APPROACHING PORT":"#1976d2",
-    }
-    for ck,cc,ccol,clbl in [
-        ("strait_of_hormuz",[26.57,56.25],"#c62828","Hormuz HRA"),
-        ("red_sea",[14.5,43.0],"#c62828","Red Sea HRA"),
-        ("gulf_of_guinea",[2.5,2.5],"#e65100","Gulf of Guinea HRA"),
-        ("cape_of_good_hope",[-34.36,18.48],"#2e7d32","Cape Alt Route"),
-    ]:
-        folium.CircleMarker(cc,radius=30,color=ccol,fill=True,fill_opacity=0.1,weight=2,popup=clbl).add_to(m)
+# ════════ FLEET AIS TRACKER ════════
+elif page=="🚢 Fleet AIS Tracker":
+    hdr("🚢 FLEET AIS TRACKER — INDIA SUPPLY CORRIDORS")
+    vs=ais_tracker.get_live_vessels(); ar=ais_tracker.get_at_risk_vessels()
+    dv=[v for v in vs if "DIVERTING" in v["status"] or "ALT ROUTE" in v["status"]]
+    cc=st.columns(4)
+    cc[0].metric("Tracked",len(vs)); cc[1].metric("⚠️ At Risk",len(ar))
+    cc[2].metric("🔄 Rerouted",len(dv)); cc[3].metric("🟢 Normal",len(vs)-len(ar)-len(dv))
+    m=folium.Map(location=[15,60],zoom_start=3,tiles="CartoDB Positron")
+    SC={"TRANSITING":"#2e7d32","TRANSITING — ALT ROUTE":"#388e3c","ANCHORED — AWAITING CLEARANCE":"#e65100","DELAYED — RISK ASSESSMENT":"#c62828","DIVERTING — CAPE ROUTE":"#ef9a00","APPROACHING PORT":"#1976d2"}
+    for ck,cc2,col,lb in [("hz",[26.57,56.25],"#c62828","Hormuz"),("rs",[14.5,43],"#c62828","Red Sea"),("gg",[2.5,2.5],"#e65100","G.Guinea"),("cp",[-34.36,18.48],"#2e7d32","Cape")]:
+        folium.CircleMarker(cc2,radius=28,color=col,fill=True,fill_opacity=0.09,weight=2,popup=lb).add_to(m)
     for r in INDIA_REFINERIES:
-        folium.CircleMarker([r["lat"],r["lon"]],radius=7,color="#0d6e6e",fill=True,
-            fill_opacity=0.8,popup=f"🏭 {r['name']}").add_to(m)
-    for v in vessels:
-        col2 = STATUS_COLORS.get(v["status"],"#888")
-        folium.CircleMarker([v["lat"],v["lon"]],radius=9,color=col2,fill=True,fill_opacity=0.9,
-            popup=f"<b>{v['name']}</b><br>{v['type']}<br>{v['cargo']}<br><b>{v['status']}</b><br>→{v['destination']}",
-            tooltip=v['name']).add_to(m)
-    st_folium(m, width=None, height=480)
-
-    hdr("📋 Vessel Feed")
-    df = pd.DataFrame([{
-        "Vessel":f"{v['icon']} {v['name']}","Type":v["type"],"Flag":v["flag"],
-        "Cargo":v["cargo"],"Status":v["status"],"Destination":v["destination"],"ETA (days)":v.get("eta_days","—"),
-    } for v in vessels])
-    st.dataframe(df, use_container_width=True, hide_index=True)
+        folium.CircleMarker([r["lat"],r["lon"]],radius=6,color="#1a3a5c",fill=True,fill_opacity=0.8,popup=f"🏭 {r['name']}").add_to(m)
+    for v in vs:
+        col=SC.get(v["status"],"#888")
+        folium.CircleMarker([v["lat"],v["lon"]],radius=8,color=col,fill=True,fill_opacity=0.9,
+            popup=f"<b>{v['name']}</b><br>{v['type']}<br>{v['cargo']}<br><b>{v['status']}</b>",tooltip=v['name']).add_to(m)
+    st_folium(m,width=None,height=470)
+    hdr("📋 VESSEL FEED")
+    st.dataframe(pd.DataFrame([{"Vessel":f"{v['icon']} {v['name']}","Type":v["type"],"Flag":v["flag"],"Cargo":v["cargo"],"Status":v["status"],"Destination":v["destination"]} for v in vs]),use_container_width=True,hide_index=True)
 
 
-# ══════════════════════════════════════════
-# PROCUREMENT ENGINE
-# ══════════════════════════════════════════
-elif page == "🛒 Procurement Engine":
-    hdr("🛒 Adaptive Procurement Orchestrator")
-    c1,c2 = st.columns(2)
-    with c1: gap = st.slider("Supply Gap to Fill (MBPD)",0.1,3.0,1.2,0.1)
-    with c2: sc_name = st.selectbox("Disruption Context",[
-        "Strait of Hormuz — 40% Reduction","Red Sea Full Suspension",
-        "OPEC+ Emergency Cut","Dual Corridor Crisis"])
-
+# ════════ PROCUREMENT ════════
+elif page=="🛒 Procurement Engine":
+    hdr("🛒 ADAPTIVE PROCUREMENT ORCHESTRATOR")
+    c1,c2=st.columns(2)
+    gap=c1.slider("Supply Gap (MBPD)",0.1,3.0,1.2,0.1)
+    scn=c2.selectbox("Context",["Strait of Hormuz — 40% Reduction","Red Sea Full Suspension","OPEC+ Emergency Cut","Dual Corridor Crisis"])
     if st.button("▶ Generate Procurement Plan",use_container_width=True):
-        with st.spinner("🤖 Procurement Agent ranking alternative sources with Claude AI..."):
-            try:
-                result = procurement_agent.run(gap, sc_name)
-                st.session_state["proc"] = result
-            except Exception as e:
-                st.error(f"Error: {e}. Check ANTHROPIC_API_KEY in .env")
-
+        with st.spinner("🤖 Ranking alternative sources..."):
+            try: st.session_state["proc"]=procurement_agent.run(gap,scn)
+            except Exception as e: st.error(f"Error: {e}")
     if "proc" in st.session_state:
-        r = st.session_state["proc"]
+        r=st.session_state["proc"]
         if "error" not in r:
-            c1,c2,c3 = st.columns(3)
-            with c1: st.metric("Gap to Fill",f"{r['_meta']['supply_gap_mbpd']:.1f} MBPD")
-            with c2: st.metric("Covered",f"{r.get('total_gap_covered_mbpd',0):.1f} MBPD")
-            with c3:
-                res = r.get("residual_gap_mbpd",0)
-                st.metric("Residual",f"{res:.2f} MBPD","✅ Covered" if res<=0 else f"⚠️ {res:.2f} uncovered")
-
-            hdr("🌍 Ranked Alternative Sources")
-            for alt in r.get("ranked_alternatives",[]):
-                conf = alt.get("confidence_score",70)
-                with st.expander(f"#{alt.get('rank','?')} {alt.get('country','?')} — {alt.get('grade','?')} | {alt.get('recommended_volume_mbpd',0):.2f} MBPD | {conf}% confidence"):
-                    ca,cb2,cc2,cd = st.columns(4)
-                    with ca: st.metric("Volume",f"{alt.get('recommended_volume_mbpd',0):.2f} MBPD")
-                    with cb2: st.metric("Mechanism",alt.get("procurement_mechanism","SPOT"))
-                    with cc2: st.metric("Transit",f"{alt.get('transit_days_to_india','?')}d")
-                    with cd: st.metric("Cost/bbl",f"${alt.get('total_cost_usd_per_barrel',0):.1f}")
-                    st.markdown(f"**Price vs Brent:** {alt.get('estimated_price_vs_brent','—')}")
-                    st.markdown(f"**Compatible Refineries:** {', '.join(alt.get('grade_compatible_refineries',[]))}")
-                    st.markdown(f"**⚡ Action Required:** {alt.get('action_required','')}")
-
-            hdr("⚡ 48-Hour Action Plan")
-            for act in r.get("immediate_actions_48h",[]):
-                st.markdown(f"**[{act.get('priority','?')}]** {act.get('action','')} — `{act.get('owner','')}` · {act.get('deadline','')}")
-
-            spr_rec = r.get("spr_drawdown_recommendation",{})
-            if spr_rec.get("initiate"):
-                st.warning(f"🛢️ SPR Drawdown Recommended: {spr_rec.get('daily_drawdown_mbpd',0):.2f} MBPD — {spr_rec.get('rationale','')}")
-
+            cc=st.columns(3)
+            cc[0].metric("Gap",f"{r['_meta']['supply_gap_mbpd']:.1f} MBPD")
+            cc[1].metric("Covered",f"{r.get('total_gap_covered_mbpd',0):.1f} MBPD")
+            res=r.get("residual_gap_mbpd",0)
+            cc[2].metric("Residual",f"{res:.2f}","✅" if res<=0 else "⚠️")
+            hdr("🌍 RANKED SOURCES")
+            for a in r.get("ranked_alternatives",[]):
+                with st.expander(f"#{a.get('rank','?')} {a.get('country','?')} — {a.get('grade','?')} | {a.get('recommended_volume_mbpd',0):.2f} MBPD | {a.get('confidence_score',70)}%"):
+                    x=st.columns(4)
+                    x[0].metric("Volume",f"{a.get('recommended_volume_mbpd',0):.2f}")
+                    x[1].metric("Mechanism",a.get("procurement_mechanism","SPOT"))
+                    x[2].metric("Transit",f"{a.get('transit_days_to_india','?')}d")
+                    x[3].metric("Cost",f"${a.get('total_cost_usd_per_barrel',0):.1f}")
+                    st.markdown(f"**Refineries:** {', '.join(a.get('grade_compatible_refineries',[]))}")
+                    st.markdown(f"**⚡ Action:** {a.get('action_required','')}")
+            hdr("⚡ 48-HOUR ACTIONS")
+            for ac in r.get("immediate_actions_48h",[]):
+                st.markdown(f"**[{ac.get('priority','?')}]** {ac.get('action','')} — `{ac.get('owner','')}` · {ac.get('deadline','')}")
             st.info(r.get("executive_summary",""))
-        else:
-            st.error(f"Error: {r.get('error')}. Check ANTHROPIC_API_KEY in .env")
+        else: st.error(f"Error: {r['error']}")
 
 
-# ══════════════════════════════════════════
-# SPR OPTIMISER
-# ══════════════════════════════════════════
-elif page == "🛢️ SPR Optimiser":
-    hdr("🛢️ Strategic Petroleum Reserve Optimiser")
-
-    fig_spr = go.Figure()
-    for site in SPR_SITES:
-        filled = site["capacity_MMbbl"]*site["current_fill_pct"]/100
-        empty  = site["capacity_MMbbl"]-filled
-        fig_spr.add_trace(go.Bar(name=f"{site['name']} Filled",x=[site["name"]],y=[filled],marker_color="#0d6e6e"))
-        fig_spr.add_trace(go.Bar(name=f"{site['name']} Empty",x=[site["name"]],y=[empty],marker_color="#e2e8f0"))
-    fig_spr.update_layout(barmode="stack",paper_bgcolor="#fff",plot_bgcolor="#fff",
-        title="SPR Site Levels (Million Barrels)",height=260,margin=dict(l=0,r=0,t=40,b=0),showlegend=False)
-    st.plotly_chart(fig_spr, use_container_width=True)
-
-    c1,c2,c3 = st.columns(3)
-    with c1: gap  = st.number_input("Supply Gap (MBPD)",0.1,5.0,1.5,0.1)
-    with c2: dur  = st.slider("Duration (days)",7,180,45)
-    with c3: sc_n = st.selectbox("Scenario",["Hormuz Partial Closure","Red Sea Suspension","OPEC Emergency Cut"])
-
+# ════════ SPR ════════
+elif page=="🛢️ Strategic Reserve":
+    hdr("🛢️ STRATEGIC PETROLEUM RESERVE OPTIMISER")
+    fig=go.Figure()
+    for s in SPR_SITES:
+        fl=s["capacity_MMbbl"]*s["current_fill_pct"]/100
+        fig.add_trace(go.Bar(name=s['name'],x=[s["name"]],y=[fl],marker_color="#1a3a5c"))
+        fig.add_trace(go.Bar(name="",x=[s["name"]],y=[s["capacity_MMbbl"]-fl],marker_color="#dde5ee"))
+    fig.update_layout(barmode="stack",paper_bgcolor="#fff",plot_bgcolor="#fff",title="SPR Levels (MMbbl)",height=250,margin=dict(l=0,r=0,t=40,b=0),showlegend=False)
+    st.plotly_chart(fig,use_container_width=True)
+    c=st.columns(3)
+    gap=c[0].number_input("Gap (MBPD)",0.1,5.0,1.5,0.1)
+    dur=c[1].slider("Duration (d)",7,180,45)
+    scn=c[2].selectbox("Scenario",["Hormuz Partial Closure","Red Sea Suspension","OPEC Emergency Cut"])
     if st.button("▶ Optimise SPR Strategy",use_container_width=True):
-        with st.spinner("🤖 SPR Optimiser computing drawdown strategy with Claude AI..."):
-            try:
-                result = spr_optimiser.run(gap, dur, sc_n)
-                st.session_state["spr"] = result
-            except Exception as e:
-                st.error(f"Error: {e}. Check ANTHROPIC_API_KEY in .env")
-
+        with st.spinner("🤖 Computing drawdown..."):
+            try: st.session_state["spr"]=spr_optimiser.run(gap,dur,scn)
+            except Exception as e: st.error(f"Error: {e}")
     if "spr" in st.session_state:
-        r = st.session_state["spr"]
+        r=st.session_state["spr"]
         if "error" not in r:
-            c1,c2,c3,c4 = st.columns(4)
-            with c1: st.metric("SPR Available",f"{r.get('spr_total_available_mmbbls',0):.0f} MMbbl")
-            with c2: st.metric("Cover",f"{r.get('spr_cover_days_current',9.5):.1f} days")
-            with c3: st.metric("Strategy",r.get("recommended_drawdown_strategy","—"))
-            with c4: st.metric("Daily Drawdown",f"{r.get('daily_drawdown_mbpd',0):.2f} MBPD")
-
-            hdr("🏭 By-Site Plan")
-            for site in r.get("by_site",[]):
-                pc = {"PRIMARY":"#c62828","SECONDARY":"#e65100","RESERVE":"#2e7d32"}.get(site.get("priority",""),"#888")
-                st.markdown(f"""<div style="border-left:4px solid {pc};padding:10px 14px;background:#fff;
-                    border-radius:0 6px 6px 0;margin-bottom:6px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-                    <b style="color:{pc};">[{site.get('priority','?')}]</b>
-                    <b> {site.get('site','?')}</b> — {site.get('drawdown_mbpd',0):.2f} MBPD<br>
-                    <span style="font-size:11px;color:#666;">{site.get('rationale','')}</span>
-                </div>""", unsafe_allow_html=True)
-
-            rep = r.get("replenishment_window",{})
-            if rep:
-                hdr("🔄 Replenishment Strategy")
-                rc1,rc2,rc3 = st.columns(3)
-                with rc1: st.metric("Start From",f"Day {rep.get('earliest_start_days_from_now','?')}")
-                with rc2: st.metric("Target Price",f"${rep.get('optimal_brent_replenishment_price',75):.0f}/bbl")
-                with rc3: st.metric("Cost",f"${rep.get('estimated_replenishment_cost_usd_bn',0):.1f}Bn")
-
-            iea = r.get("iea_coordination",{})
-            if iea.get("recommended"):
-                st.success(f"🌐 IEA coordination recommended — Est. +{iea.get('estimated_iea_contribution_mbpd',0):.1f} MBPD from members")
-
+            cc=st.columns(4)
+            cc[0].metric("Available",f"{r.get('spr_total_available_mmbbls',0):.0f} MMbbl")
+            cc[1].metric("Cover",f"{r.get('spr_cover_days_current',9.5):.1f}d")
+            cc[2].metric("Strategy",r.get("recommended_drawdown_strategy","—"))
+            cc[3].metric("Rate",f"{r.get('daily_drawdown_mbpd',0):.2f} MBPD")
+            hdr("🏭 BY-SITE PLAN")
+            for s in r.get("by_site",[]):
+                pc={"PRIMARY":"#c62828","SECONDARY":"#e65100","RESERVE":"#2e7d32"}.get(s.get("priority",""),"#888")
+                st.markdown(f"""<div style="border-left:4px solid {pc};padding:10px 14px;background:#fff;border-radius:0 6px 6px 0;margin-bottom:6px;">
+                    <b style="color:{pc};">[{s.get('priority','?')}]</b> <b>{s.get('site','?')}</b> — {s.get('drawdown_mbpd',0):.2f} MBPD<br>
+                    <span style="font-size:11px;color:#667;">{s.get('rationale','')}</span></div>""",unsafe_allow_html=True)
             st.info(r.get("executive_recommendation",""))
-        else:
-            st.error(f"Error: {r.get('error')}. Check ANTHROPIC_API_KEY in .env")
+        else: st.error(f"Error: {r['error']}")
+
+
+# ════════ API STATUS ════════
+elif page=="🔌 API Status":
+    hdr(f"🔌 DATA SOURCE REGISTRY — {ALL_API_COUNT} APIS")
+    from config.settings import (VESSEL_APIS,SANCTIONS_APIS,COMMODITY_APIS,WEATHER_APIS,PORT_APIS,NEWS_APIS,GEO_APIS,FX_APIS,FREIGHT_APIS,CARBON_APIS,
+        VESSELAPI_KEY,AIS_API_KEY,NEWS_API_KEY,EIA_API_KEY)
+    cats=[("🚢 Vessel / AIS Tracking",VESSEL_APIS,8),("🔒 Sanctions / Compliance",SANCTIONS_APIS,6),
+        ("💰 Commodity / Markets",COMMODITY_APIS,7),("🌊 Weather / Metocean",WEATHER_APIS,5),
+        ("⚓ Port / Incident Intel",PORT_APIS,6),("📰 News / Geopolitical",NEWS_APIS,4),
+        ("🗺️ Geospatial / Mapping",GEO_APIS,3),("💱 Economic / FX",FX_APIS,3),
+        ("🚛 Bunker / Freight",FREIGHT_APIS,6),("🌱 Carbon / Environmental",CARBON_APIS,4)]
+    cols=st.columns(2)
+    for i,(name,apis,cnt) in enumerate(cats):
+        with cols[i%2]:
+            rows=""
+            for k,url in apis.items():
+                free = any(x in str(url).lower() for x in ["openmeteo","gdelt","frankfurter","exchangerate","ofac","ec.europa","un.org","ukmto","icc","worldbank","carbonintensity","internal","naturalearth","openseamap"])
+                status = "🟢 FREE" if free else "🔑 Key"
+                rows+=f"<div style='display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid #f0f0f0;'><span>{k}</span><span>{status}</span></div>"
+            st.markdown(f"""<div class="card"><div style="font-size:13px;font-weight:700;color:#1a3a5c;margin-bottom:6px;">{name} ({cnt})</div>{rows}</div>""",unsafe_allow_html=True)
+    st.markdown("---")
+    active=[("Anthropic Claude","🟢 Active" if os.getenv("ANTHROPIC_API_KEY") else "🔴 No key"),
+            ("VesselAPI (live AIS)","🟢 Active" if VESSELAPI_KEY else "⚪ Add key for real IMO data"),
+            ("NewsAPI","🟢 Active" if NEWS_API_KEY else "⚪ Optional"),
+            ("EIA (US Gov oil data)","🟢 Active" if EIA_API_KEY else "⚪ Optional"),
+            ("Open-Meteo Marine","🟢 Active (free)"),("OFAC Sanctions","🟢 Active (free)"),
+            ("GDELT News","🟢 Active (free)"),("Frankfurter FX","🟢 Active (free)")]
+    hdr("⚙️ CURRENTLY CONFIGURED")
+    ac=st.columns(2)
+    for i,(n,s) in enumerate(active):
+        ac[i%2].markdown(f"<div style='background:#fff;border:1px solid #dde5ee;border-radius:7px;padding:8px 14px;margin-bottom:6px;font-size:12px;'><b>{n}</b> — {s}</div>",unsafe_allow_html=True)

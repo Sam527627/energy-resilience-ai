@@ -62,8 +62,8 @@ def generate_vra_pdf(vra: dict, output_path: str) -> str:
 
     # ── HEADER BANNER ──
     header_data = [[
-        Paragraph("FORESIGHT", brand),
-        Paragraph("INTELLIGENCE BRIEF<br/><font size=7 color='#666666'>HR MARITIME CONSULTANTS</font>", sub)
+        Paragraph("MERIDIAN", brand),
+        Paragraph("INTELLIGENCE BRIEF<br/><font size=7 color='#666666'>MARITIME INTELLIGENCE</font>", sub)
     ]]
     header_tbl = Table(header_data, colWidths=[100*mm, 70*mm])
     header_tbl.setStyle(TableStyle([
@@ -214,9 +214,9 @@ def generate_vra_pdf(vra: dict, output_path: str) -> str:
 
     # ── SIGNATURE ──
     sig_data = [[
-        Paragraph("<b>Capt. Ritesh Kapoor</b><br/><font size=7 color='#666666'>Director of Operations<br/>HR Maritime Consultants</font>",
+        Paragraph("<b>Meridian Analyst Desk</b><br/><font size=7 color='#666666'>Senior Maritime Analyst<br/>Meridian Maritime Intelligence</font>",
                   ParagraphStyle("sig", parent=body, fontSize=9, leading=12, textColor=TEAL)),
-        Paragraph(f"<font size=7 color='#666666'>Generated: {datetime.now().strftime('%d %b %Y %H:%M UTC')}<br/>Foresight Intelligence Platform<br/>Ref: FIP-VRA-{vra.get('imo','000')[-4:]}-{datetime.now().strftime('%m%d')}</font>",
+        Paragraph(f"<font size=7 color='#666666'>Generated: {datetime.now().strftime('%d %b %Y %H:%M UTC')}<br/>Meridian Maritime Intelligence<br/>Ref: MMI-VRA-{vra.get('imo','000')[-4:]}-{datetime.now().strftime('%m%d')}</font>",
                   ParagraphStyle("ref", parent=small, alignment=TA_LEFT))
     ]]
     sig_tbl = Table(sig_data, colWidths=[90*mm, 80*mm])
@@ -231,7 +231,7 @@ def generate_vra_pdf(vra: dict, output_path: str) -> str:
     story.append(HRFlowable(width="100%", thickness=0.5, color=HexColor("#cccccc")))
     disclaimer = ("This assessment is provided for the named vessel and voyage only, based on intelligence available at the time of issue. "
                   "Threat environments evolve rapidly; this VRA should be read in conjunction with live UKMTO/MSCHOA advisories. "
-                  "© HR Maritime Consultants — Foresight Intelligence Platform. Confidential.")
+                  "© Meridian Maritime Intelligence — Meridian Maritime Intelligence. Confidential.")
     story.append(Paragraph(disclaimer, ParagraphStyle("disc", parent=small, fontSize=6.5, leading=8, textColor=HexColor("#999999"))))
 
     doc.build(story)
